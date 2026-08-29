@@ -102,7 +102,7 @@ export const OptionItem = ({
     >
       <View style={styles.content}>
         {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, selected && styles.selectedLabel]}>{label}</Text>
       </View>
       {type === 'multi' ? (
         <View style={[styles.checkbox, selected && styles.checkedBox]} />
@@ -161,7 +161,11 @@ const styles = StyleSheet.create({
   selectedOption: {
     borderColor: COLORS.primary,
     borderWidth: 1.5,
-    backgroundColor: COLORS.primarySoft,
+    // Solid purple so the white selected label stays readable.
+    backgroundColor: COLORS.primary,
+  },
+  selectedLabel: {
+    color: COLORS.white,
   },
   content: {
     flexDirection: 'row',
@@ -185,9 +189,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 4,
   },
+  // White box on the now-purple selected card.
   checkedBox: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.white,
   },
 });
 

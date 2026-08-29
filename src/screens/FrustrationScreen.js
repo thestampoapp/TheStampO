@@ -54,6 +54,7 @@ const FrustrationScreen = ({ navigation }) => {
           title="Continue" 
           variant="secondary"
           style={selected.length > 0 ? styles.activeButton : styles.disabledButton}
+          textStyle={selected.length > 0 ? styles.activeButtonText : null}
           onPress={() => selected.length > 0 && navigation.navigate('PersonaSwipe')} 
         />
       </ScrollView>
@@ -109,6 +110,9 @@ const styles = StyleSheet.create({
   },
   activeButton: {
     backgroundColor: COLORS.primary,
+  },
+  activeButtonText: {
+    color: COLORS.white,
   },
   disabledButton: {
     backgroundColor: COLORS.greyMedium,

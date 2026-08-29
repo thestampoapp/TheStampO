@@ -44,6 +44,7 @@ const ExcitementScreen = ({ navigation }) => {
           title="Continue" 
           variant="secondary"
           style={selected ? styles.activeButton : styles.disabledButton}
+          textStyle={selected ? styles.activeButtonText : null}
           onPress={() => selected && navigation.navigate('Frustration')} 
         />
       </ScrollView>
@@ -99,6 +100,9 @@ const styles = StyleSheet.create({
   },
   activeButton: {
     backgroundColor: COLORS.primary,
+  },
+  activeButtonText: {
+    color: COLORS.white,
   },
   disabledButton: {
     backgroundColor: COLORS.greyMedium,

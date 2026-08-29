@@ -554,7 +554,10 @@ const CameraScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>Frame one moment, then make it yours.</Text>
         <TouchableOpacity
           style={[styles.skip, { top: ANDROID_STATUS_BAR + 30 }]}
-          onPress={() => navigation.navigate('StampDetail', {})}
+          // Skip means "not now": send them straight to the account gate
+          // (Signup has a "Log in" link for existing users). Never open the
+          // save screen here -- with no photo it would show an empty stamp.
+          onPress={() => navigation.navigate('Signup')}
         >
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>

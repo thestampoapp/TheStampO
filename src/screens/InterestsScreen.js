@@ -10,7 +10,7 @@ const InterestItem = ({ label, icon, selected, onPress }) => (
     onPress={onPress}
   >
     <Text style={styles.iconText}>{icon}</Text>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={[styles.label, selected && styles.selectedLabel]}>{label}</Text>
   </TouchableOpacity>
 );
 
@@ -64,6 +64,7 @@ const InterestsScreen = ({ navigation }) => {
           title="Continue" 
           variant="secondary"
           style={selected.length > 0 ? styles.activeButton : styles.disabledButton}
+          textStyle={selected.length > 0 ? styles.activeButtonText : null}
           onPress={() => selected.length > 0 && navigation.navigate('Privacy')} 
         />
       </ScrollView>
@@ -130,7 +131,11 @@ const styles = StyleSheet.create({
   },
   selectedItem: {
     borderColor: COLORS.primary,
-    backgroundColor: '#F6F0FB',
+    // Solid purple so the white selected label stays readable.
+    backgroundColor: COLORS.primary,
+  },
+  selectedLabel: {
+    color: COLORS.white,
   },
   iconText: {
     fontSize: 30,
@@ -145,6 +150,9 @@ const styles = StyleSheet.create({
   },
   activeButton: {
     backgroundColor: COLORS.primary,
+  },
+  activeButtonText: {
+    color: COLORS.white,
   },
   disabledButton: {
     backgroundColor: COLORS.greyMedium,
