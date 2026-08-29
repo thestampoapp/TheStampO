@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "235053798731",
+    "project_id": "thestampo-83f29",
+    "storage_bucket": "thestampo-83f29.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:235053798731:android:d93810759ff7a9bd4844ce",
+        "android_client_info": {
+          "package_name": "com.kunatic.thestampo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "235053798731-518l7m1esp83bp01bs75usegb3bltg22.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kunatic.thestampo",
+            "certificate_hash": "aa857d74a341cf42ae1a3ba90e1727a174802ae5"
+          }
+        },
+        {
+          "client_id": "235053798731-3fe9tt566knrj5ddbo2vtevc2au3q4ee.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcbQiewSwpS1N5nU9EwON6aZ2Py2JpciM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "235053798731-3fe9tt566knrj5ddbo2vtevc2au3q4ee.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
