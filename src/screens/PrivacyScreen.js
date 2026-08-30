@@ -25,7 +25,7 @@ const PrivacyScreen = ({ navigation }) => {
     {
       icon: '🔒',
       title: 'We never see your images',
-      description: 'Stampa works completely offline. Your memories are yours alone and we have zero access.',
+      description: 'StampO works completely offline. Your memories are yours alone and we have zero access.',
     },
     {
       icon: '🚫',
@@ -53,7 +53,7 @@ const PrivacyScreen = ({ navigation }) => {
             <Text style={styles.shieldIcon}>🛡️</Text>
           </View>
           <Text style={styles.title}>Your privacy comes first</Text>
-          <Text style={styles.subtitle}>Everything you create in Stampa stays 100% on your device. Here's our promise:</Text>
+          <Text style={styles.subtitle}>Everything you create in StampO stays 100% on your device. Here's our promise:</Text>
         </View>
 
         <View style={styles.list}>

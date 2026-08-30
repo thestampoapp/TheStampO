@@ -56,6 +56,7 @@ import {
   signOut as fbSignOut,
   friendlyError,
 } from './firebase';
+import { setStampOwner } from './stampStore';
 
 /** Set true to demo the flow without hitting Firebase at all. */
 export const FORCE_MOCK_AUTH = false;
@@ -127,6 +128,8 @@ const shape = (u) =>
 function setUserEverywhere(u) {
   currentUser = u;
   resolved = true;
+  // The stamp index is per-account: switching users switches collections.
+  setStampOwner(u ? u.uid : null);
   listeners.forEach((fn) => {
     try {
       fn(currentUser);
@@ -248,9 +251,12 @@ const mockApi = {
     if (currentUser) setUserEverywhere({ ...currentUser, name });
     return { ok: true };
   },
-  async deleteAccount() {
+  async deleteAccount(password) {
     warnMockOnce();
     await settle();
+    if (!password) {
+      return { ok: false, error: 'Enter your password to confirm deletion.' };
+    }
     setUserEverywhere(null);
     return { ok: true };
   },
@@ -342,6 +348,7 @@ async function run(fn) {
       user: shape(user),
       linked: !!(out && out.linked),
       mergedIntoExisting: !!(out && out.mergedIntoExisting),
+      verificationSent: !!(out && out.verificationSent),
       error: undefined,
     };
   } catch (err) {

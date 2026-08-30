@@ -199,7 +199,7 @@ const CaptureScreen = ({ navigation }) => {
     if (current && current.canAskAgain === false) {
       showDialog({
         title: 'Camera access is off',
-        message: 'Android has stopped showing the permission dialog for Stampa. Turn the camera on in Settings and come straight back.',
+        message: 'Android has stopped showing the permission dialog for TheStampO. Turn the camera on in Settings and come straight back.',
         actions: [
           { label: 'Not now', variant: 'secondary' },
           { label: 'Open Settings', variant: 'primary', onPress: () => Linking.openSettings().catch(() => {}) },

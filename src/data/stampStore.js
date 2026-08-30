@@ -58,7 +58,12 @@ function warnOnce() {
   );
 }
 
-const INDEX_KEY = '@stampa/stamps/v1';
+// Per-account isolation: the index lives under a per-uid key, so signing in
+// with a different account shows THAT account's collection, not whatever the
+// device had before. The old single key is read once and migrated.
+const LEGACY_INDEX_KEY = '@stampa/stamps/v1';
+const indexKeyFor = (uid) => `@stampa/stamps/v1::${uid || 'anonymous'}`;
+let owner = null;
 const STAMP_DIR = `${FileSystem.documentDirectory}stamps/`;
 
 /** In-memory cache + subscribers, so every mounted screen stays in step. */
@@ -126,7 +131,7 @@ async function readIndex() {
     return [];
   }
   try {
-    const raw = await AsyncStorage.getItem(INDEX_KEY);
+    const raw = await AsyncStorage.getItem(indexKeyFor(owner));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
@@ -144,7 +149,7 @@ async function writeIndex(list) {
     return;
   }
   try {
-    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(list));
+    await AsyncStorage.setItem(indexKeyFor(owner), JSON.stringify(list));
   } catch (e) {
     /* the in-memory copy still reflects the change */
   }
@@ -154,12 +159,46 @@ async function writeIndex(list) {
 const sortStamps = (list) =>
   [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-/** Load all stamps (cached after the first call). */
+/** Load all stamps for the current owner (cached after the first call). */
 export async function loadStamps() {
   if (cache) return cache;
-  cache = sortStamps(await readIndex());
+  let list = sortStamps(await readIndex());
+
+  // One-time migration: a collection saved before per-account storage moves
+  // to whoever is signed in when the updated app first runs.
+  if (!list.length && owner && AsyncStorage) {
+    try {
+      const raw = await AsyncStorage.getItem(LEGACY_INDEX_KEY);
+      const legacy = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(legacy) && legacy.length) {
+        list = sortStamps(legacy);
+        cache = list;
+        await AsyncStorage.setItem(indexKeyFor(owner), JSON.stringify(list));
+        await AsyncStorage.removeItem(LEGACY_INDEX_KEY);
+        notify();
+        return cache;
+      }
+    } catch (e) {
+      /* migration is best-effort */
+    }
+  }
+
+  cache = list;
   notify();
   return cache;
+}
+
+/**
+ * Switch the collection to the given account's. Called on every auth change;
+ * null (signed out) maps to the anonymous bucket.
+ */
+export function setStampOwner(uid) {
+  const next = uid || null;
+  if (next === owner) return;
+  owner = next;
+  cache = null;
+  notify();
+  loadStamps();
 }
 
 /**

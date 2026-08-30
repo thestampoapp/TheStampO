@@ -171,8 +171,15 @@ const LoginScreen = ({ navigation }) => {
     if (Object.keys(next).length) return;
 
     const res = await signIn({ email, password });
-    if (res.ok) await goNext();
-    else if (res.error) setErrors({ form: res.error });
+    if (res.ok) {
+      if (res.user?.email && !res.user.emailVerified) {
+        navigation.reset({ index: 0, routes: [{ name: 'VerifyEmail' }] });
+      } else {
+        await goNext();
+      }
+    } else if (res.error) {
+      setErrors({ form: res.error });
+    }
   }, [email, password, signIn, goNext]);
 
   const handleGoogle = useCallback(async () => {

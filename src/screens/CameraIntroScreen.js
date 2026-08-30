@@ -43,7 +43,7 @@ const CameraIntroScreen = ({ navigation }) => {
         </View>
 
         <Text style={styles.title}>Ready to capture your first stamp?</Text>
-        <Text style={styles.subtitle}>Stampa uses your camera to frame the world through a stamp-shaped viewfinder</Text>
+        <Text style={styles.subtitle}>StampO uses your camera to frame the world through a stamp-shaped viewfinder</Text>
 
         <View style={styles.list}>
           {items.map((item, i) => (

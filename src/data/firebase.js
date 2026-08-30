@@ -419,6 +419,24 @@ export async function sendReset(email) {
   await A.sendPasswordResetEmail(instance, email.trim());
 }
 
+/** Reload the user from Firebase so emailVerified is fresh. */
+export async function reloadUser() {
+  const instance = requireAuth();
+  const user = instance.currentUser;
+  if (!user) return null;
+  await A.reload(user);
+  return instance.currentUser || user;
+}
+
+/** (Re-)send the account verification email. */
+export async function sendVerification() {
+  const instance = requireAuth();
+  const user = instance.currentUser;
+  if (!user || !user.email) return null;
+  await A.sendEmailVerification(user);
+  return user;
+}
+
 /** Re-send the verification email to the signed-in user. */
 export async function resendEmailVerification() {
   const instance = requireAuth();
@@ -568,7 +586,17 @@ export async function deleteAccount(password) {
   const user = instance.currentUser;
   if (!user) return false;
 
-  if (password && user.email) {
+  // Password accounts must PROVE the password before deletion: reauth with
+  // a wrong password throws, so deleteUser never runs on a bad guess.
+  const hasPassword = (user.providerData || []).some(
+    (p) => p.providerId === 'password'
+  );
+  if (hasPassword) {
+    if (!password) {
+      const e = new Error('Enter your password to confirm deletion.');
+      e.code = 'auth/wrong-password';
+      throw e;
+    }
     const credential = A.EmailAuthProvider.credential(user.email, password);
     await A.reauthenticateWithCredential(user, credential);
   }

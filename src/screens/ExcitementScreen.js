@@ -24,7 +24,7 @@ const ExcitementScreen = ({ navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>What excites you most about Stampa?</Text>
+        <Text style={styles.title}>What excites you most about StampO?</Text>
         <Text style={styles.subtitle}>Pick the one that fits you best</Text>
 
         <View style={styles.optionsContainer}>

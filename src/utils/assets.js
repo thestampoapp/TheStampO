@@ -24,7 +24,7 @@
 export function getPunchSound() {
   try {
     // eslint-disable-next-line global-require
-    return require('../../punch.mp3');
+    return require('../../punch2.mp3');
   } catch (e) {
     return null;
   }

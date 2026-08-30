@@ -94,6 +94,11 @@ function PromptSheet({ visible, title, subtitle, fields, confirmLabel, danger, b
     if (visible) setValues({});
   }, [visible]);
 
+  // Confirm stays disabled until every required field has content.
+  const missing = fields.some(
+    (f) => f.required && !(values[f.key] || '').trim()
+  );
+
   return (
     <Modal
       visible={visible}
@@ -135,7 +140,7 @@ function PromptSheet({ visible, title, subtitle, fields, confirmLabel, danger, b
               style={[styles.confirmBtn, danger && styles.confirmDanger]}
               onPress={() => onConfirm(values)}
               activeOpacity={ACTIVE_OPACITY}
-              disabled={busy}
+              disabled={busy || missing}
             >
               {busy ? (
                 <ActivityIndicator color="#fff" size="small" />
@@ -223,6 +228,11 @@ const AccountScreen = ({ navigation }) => {
           newEmail: values.email,
         });
       } else if (prompt === 'delete') {
+        if (!(values.current || '').trim()) {
+          setBusy(false);
+          setError('Enter your password to confirm deletion.');
+          return;
+        }
         res = await deleteAccount(values.current);
       }
 
@@ -233,10 +243,18 @@ const AccountScreen = ({ navigation }) => {
         if (prompt === 'delete') {
           navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
         } else if (prompt === 'email') {
-          showDialog({
-            title: 'Check your inbox',
-            message: 'Confirm the link we sent to finish changing your email.',
-          });
+          if (res.verificationSent) {
+            showDialog({
+              title: 'Check your inbox',
+              message: `We sent a confirmation link to ${values.email.trim()}. Your email changes once you open it - check spam if it is not there.`,
+            });
+          } else {
+            showDialog({
+              title: 'Email updated (mock)',
+              message:
+                'MOCK AUTH changed it locally only. No verification email is sent until you build with Firebase installed.',
+            });
+          }
         } else {
           showDialog({ title: 'Done', message: 'Your password has been changed.' });
         }
@@ -272,7 +290,9 @@ const AccountScreen = ({ navigation }) => {
         'This permanently deletes your account. Stamps on this device are not removed.',
       confirmLabel: 'Delete forever',
       danger: true,
-      fields: [{ key: 'current', placeholder: 'Password', secure: true }],
+      fields: [
+        { key: 'current', placeholder: 'Password', secure: true, required: true },
+      ],
     },
   }[prompt] || { fields: [] };
 

@@ -38,6 +38,7 @@ import {
   BackHandler,
   Linking,
   Keyboard,
+  ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -69,6 +70,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** Below this much leftover space the hero is dropped rather than squashed. */
 const HERO_MIN = 96;
 const HERO_MAX = 190;
+
+/** Worst-case height of the dev-only MOCK AUTH banner (pad + title + 3 reason
+ *  lines + margins). It is real content that the old vertical budget ignored,
+ *  which pushed the social/login rows off the bottom of the screen. */
+const BANNER_H = 92;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -156,15 +162,15 @@ const SignupScreen = ({ navigation }) => {
 
     // Everything that is not the hero, at comfortable sizes.
     const comfortable = {
-      pad: 14,
-      back: 34,
+      pad: 12,
+      back: 30,
       title: 34,
-      subtitle: 40,
+      subtitle: 56, // 2 lines * 21 lineHeight + 14 marginBottom
       field: 54,
-      fieldGap: 11,
+      fieldGap: 9,
       terms: 30,
       cta: 56,
-      orRow: 40,
+      orRow: 36,
       social: 52,
       login: 26,
     };
@@ -174,7 +180,7 @@ const SignupScreen = ({ navigation }) => {
       pad: 8,
       back: 30,
       title: 30,
-      subtitle: 22,
+      subtitle: 30, // 1 line + 10 marginBottom
       field: 48,
       fieldGap: 8,
       terms: 26,
@@ -191,11 +197,14 @@ const SignupScreen = ({ navigation }) => {
       m.subtitle +
       m.field * 4 +
       m.fieldGap * 3 +
-      12 + m.terms +
+      18 + m.terms + // error slot renders with minHeight 18
       12 + m.cta +
       m.orRow +
       m.social +
-      10 + m.login;
+      10 + m.login +
+      // The mock banner is real content too: when Firebase is missing it
+      // takes ~92dp, and ignoring it clipped everything below it.
+      (isMock ? BANNER_H : 0);
 
     let m = comfortable;
     let used = measure(m);
@@ -205,11 +214,18 @@ const SignupScreen = ({ navigation }) => {
     }
 
     const leftover = usable - used;
-    // The hero absorbs slack; it vanishes if there isn't enough for it.
-    const heroH = leftover >= HERO_MIN ? clamp(leftover, HERO_MIN, HERO_MAX) : 0;
+    // The hero absorbs slack. If there is some slack but not a full hero's
+    // worth, still render the minimum hero and let the ScrollView carry the
+    // small overflow -- losing the illustration entirely reads as a bug.
+    const heroH =
+      leftover >= HERO_MIN
+        ? clamp(leftover, HERO_MIN, HERO_MAX)
+        : leftover >= 0
+          ? HERO_MIN
+          : 0;
 
     return { ...m, heroH, fits: used <= usable };
-  }, [winH, bottomInset]);
+  }, [winH, bottomInset, isMock]);
 
   const showHero = L.heroH > 0 && !keyboardUp;
 
@@ -255,7 +271,16 @@ const SignupScreen = ({ navigation }) => {
     setSubmitting(false);
 
     if (res.ok) {
-      await goNext();
+      // Real email accounts must prove inbox ownership first: the
+      // verification email already went out during signup, so route them to
+      // the gate instead of straight into the collection.
+      const needsVerify =
+        !isMock && !!res.user?.email && !res.user.emailVerified;
+      await setOnboarded(true);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: needsVerify ? 'VerifyEmail' : NEXT_ROUTE }],
+      });
       return;
     }
     // res.error === null means the user cancelled -- say nothing.
@@ -310,6 +335,15 @@ const SignupScreen = ({ navigation }) => {
           enterStyle,
         ]}
       >
+        {/* Safety valve: normally everything fits on one screen, but if the
+            budget is ever exceeded (huge fonts, extra banners) the content
+            scrolls instead of being clipped off the bottom. */}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <TouchableOpacity
           style={[styles.back, { height: L.back }]}
           onPress={goNext}
@@ -502,6 +536,7 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.loginLink}>Log in</Text>
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
@@ -532,6 +567,8 @@ const styles = StyleSheet.create({
   },
 
   container: { flex: 1, backgroundColor: BG },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
 
   page: {
     flex: 1,

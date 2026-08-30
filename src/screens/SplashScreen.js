@@ -75,7 +75,8 @@ const SplashScreen = ({ navigation }) => {
         if (MONETIZATION_ENABLED) {
           await loadSubscription(user.uid).catch(() => {});
         }
-        dest = 'Collections';
+        dest =
+          user.email && !user.emailVerified ? 'VerifyEmail' : 'Collections';
       } else if (state?.onboarded) {
         dest = 'Login';
       }
@@ -100,7 +101,7 @@ const SplashScreen = ({ navigation }) => {
           },
         ]}
       >
-        <Text style={styles.logoText}>TheStampo</Text>
+        <Text style={styles.logoText}>TheStampO</Text>
       </Animated.View>
     </View>
   );

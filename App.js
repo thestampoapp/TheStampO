@@ -25,6 +25,7 @@ import SavedStampScreen from './src/screens/SavedStampScreen';
 import RatingScreen from './src/screens/RatingScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
 import PhoneAuthScreen from './src/screens/PhoneAuthScreen';
 import CollectionsScreen from './src/screens/CollectionsScreen';
 import CollectionScreen from './src/screens/CollectionScreen';
@@ -117,6 +118,7 @@ export default function App() {
   />
 
   <Stack.Screen name="Login" component={LoginScreen} />
+  <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
   <Stack.Screen name="PhoneAuth" component={PhoneAuthScreen} />
   <Stack.Screen name="Collections" component={CollectionsScreen} />
 

@@ -61,7 +61,7 @@ const FeaturesScreen = ({ navigation }) => {
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.title}>A better way to capture memories</Text>
-          <Text style={styles.subtitle}>Here's how Stampa helps</Text>
+          <Text style={styles.subtitle}>Here's how StampO helps</Text>
 
           <View style={styles.featuresList}>
             {features.map((f, i) => (

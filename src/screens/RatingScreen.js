@@ -414,7 +414,7 @@ const RatingScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, shadow(4)]}>
             <View style={styles.appIcon}>
-              <Text style={styles.appIconGlyph}>📕</Text>
+              <Text style={styles.appIconGlyph}>📮</Text>
             </View>
 
             <Text style={styles.modalTitle}>Enjoying StampO?</Text>

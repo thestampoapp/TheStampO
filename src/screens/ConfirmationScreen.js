@@ -80,7 +80,7 @@ const ConfirmationScreen = ({ navigation }) => {
 
         {/* Subtitle */}
         <Animated.Text style={[styles.subtitle, { opacity: textOpacity }]}>
-          Let's show you how Stampa helps.
+          Let's show you how StampO helps.
         </Animated.Text>
 
         {/* Continue Button */}
