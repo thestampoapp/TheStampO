@@ -46,6 +46,8 @@ import {
   signUpWithEmail,
   signInWithEmail,
   signInWithGoogle,
+  reloadUser,
+  resendEmailVerification,
   startPhoneSignIn,
   confirmPhoneCode,
   sendReset,
@@ -122,6 +124,9 @@ const shape = (u) =>
         phone: u.phoneNumber || null,
         photo: u.photoURL || null,
         isAnonymous: !!u.isAnonymous,
+        // This is a security state, not display-only metadata: Login,
+        // Splash, and VerifyEmail all use it to decide where users go.
+        emailVerified: !!u.emailVerified,
       }
     : null;
 
@@ -159,6 +164,7 @@ function mockUser(overrides = {}) {
     phone: null,
     photo: null,
     isAnonymous: false,
+    emailVerified: true,
     ...overrides,
   };
 }
@@ -433,6 +439,42 @@ export function useAuth() {
     [guard]
   );
 
+  /**
+   * Fetch the current Firebase user again after the user opens an email
+   * verification link. Firebase does not emit a normal auth-state event for
+   * this field change, so update our shared snapshot explicitly.
+   */
+  const refreshUser = useCallback(async () => {
+    setBusy(true);
+    try {
+      if (isMockAuth()) {
+        return { ok: true, user: currentUser };
+      }
+      const refreshed = await reloadUser();
+      const next = shape(refreshed);
+      setUserEverywhere(next);
+      return { ok: true, user: next };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err), code: err?.code };
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  /** Send another verification link for the email account currently signed in. */
+  const resendVerification = useCallback(async () => {
+    setBusy(true);
+    try {
+      if (isMockAuth()) return { ok: true };
+      await resendEmailVerification();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err), code: err?.code };
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const signOut = useCallback(guard(() => fbSignOut(), mockApi.signOut), [guard]);
 
   const changePassword = useCallback(
@@ -483,6 +525,8 @@ export function useAuth() {
     requestCode,
     confirmCode,
     resetPassword,
+    refreshUser,
+    resendVerification,
     signOut,
     changePassword,
     changeEmail,

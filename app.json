@@ -43,7 +43,13 @@
             "minSdkVersion": 24,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "extraProguardRules": "-keep class com.google.android.gms.** { *; }\n-keep class com.google.android.gms.ads.** { *; }\n-keep class com.google.firebase.** { *; }\n-keep class io.invertase.firebase.** { *; }\n-keep class io.invertase.googlemobileads.** { *; }\n-dontwarn com.google.android.gms.**\n-dontwarn com.google.firebase.**\n"
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enableBundleCompression": true,
+            "useLegacyPackaging": true,
+            "buildArchs": [
+              "arm64-v8a"
+            ]
           }
         }
       ],
@@ -69,20 +75,13 @@
         }
       ],
       [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-9787924287473838~1465716759"
-        }
-      ],
-      [
         "expo-media-library",
         {
           "photosPermission": "TheStampO saves your stamps to your gallery.",
           "savePhotosPermission": "TheStampO saves your stamps to your gallery.",
           "isAccessMediaLocationEnabled": false
         }
-      ],
-      "expo-font"
+      ]
     ],
     "extra": {
       "eas": {
