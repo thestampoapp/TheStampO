@@ -9,6 +9,18 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "ios": {
+      "bundleIdentifier": "com.kunatic.thestampo",
+      "supportsTablet": false,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "TheStampO uses your camera to punch photos into stamps.",
+        "NSPhotoLibraryUsageDescription": "TheStampO needs your photos so you can turn one into a stamp.",
+        "NSPhotoLibraryAddUsageDescription": "TheStampO saves your stamps to your gallery.",
+        "NSLocationWhenInUseUsageDescription": "TheStampO tags a stamp with where you were, only when you tap the location button.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
     "android": {
       "package": "com.kunatic.thestampo",
       "googleServicesFile": "./google-services.json",
@@ -33,7 +45,14 @@
       ]
     },
     "plugins": [
-      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
       "@react-native-firebase/auth",
       "@react-native-google-signin/google-signin",
       [
@@ -50,6 +69,9 @@
             "buildArchs": [
               "arm64-v8a"
             ]
+          },
+          "ios": {
+            "useFrameworks": "static"
           }
         }
       ],
