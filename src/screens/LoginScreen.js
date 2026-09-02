@@ -325,16 +325,21 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.socialText}>Google</Text>
           </TouchableOpacity>
 
-          <View style={{ width: 12 }} />
+          {/*
+            Phone OTP is intentionally not part of this release. Keep this
+            entry point beside the retained PhoneAuth screen so it can be
+            restored later without rebuilding the authentication flow.
 
-          <TouchableOpacity
-            style={[styles.socialBtn, { height: L.social }]}
-            activeOpacity={ACTIVE_OPACITY}
-            onPress={() => navigation.navigate('PhoneAuth')}
-          >
-            <Feather name="smartphone" size={18} color={INK} />
-            <Text style={styles.socialText}>Phone</Text>
-          </TouchableOpacity>
+            <View style={{ width: 12 }} />
+            <TouchableOpacity
+              style={[styles.socialBtn, { height: L.social }]}
+              activeOpacity={ACTIVE_OPACITY}
+              onPress={() => navigation.navigate('PhoneAuth')}
+            >
+              <Feather name="smartphone" size={18} color={INK} />
+              <Text style={styles.socialText}>Phone</Text>
+            </TouchableOpacity>
+          */}
         </View>
 
         <View style={styles.spacer} />

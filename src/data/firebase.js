@@ -235,10 +235,18 @@ const MESSAGES = {
   'auth/network-request-failed': 'No connection. Check your internet.',
   'auth/operation-not-allowed': 'That sign-in method is not enabled yet.',
   'auth/invalid-verification-code': 'That code is not right. Check and retry.',
+  'auth/missing-verification-code': 'Enter the six-digit code from the SMS.',
+  'auth/missing-verification-id': 'Request a new code and try again.',
+  'auth/invalid-verification-id': 'That code has expired. Request a new one.',
   'auth/invalid-phone-number': 'That phone number looks wrong.',
   'auth/missing-phone-number': 'Enter your phone number.',
   'auth/quota-exceeded': 'Too many codes requested today. Try again tomorrow.',
   'auth/session-expired': 'The code expired. Request a new one.',
+  'auth/invalid-app-credential':
+    'This app could not complete its security check. Check the Android SHA keys in Firebase and try again.',
+  'auth/app-not-authorized':
+    'Phone sign-in is not authorized for this Android app. Check the Firebase Android app setup.',
+  'auth/captcha-check-failed': 'The security check failed. Wait a moment and try again.',
   'auth/requires-recent-login': 'Please log in again to continue.',
   'auth/credential-already-in-use':
     'That account already exists. Signing you into it instead.',
@@ -495,7 +503,13 @@ export async function signInWithGoogle() {
 /** Step 1 of phone auth: returns a confirmation handle. */
 export async function startPhoneSignIn(phoneNumber) {
   const instance = requireAuth();
-  return A.signInWithPhoneNumber(instance, phoneNumber);
+  const normalized = String(phoneNumber || '').replace(/\s/g, '');
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
+    const e = new Error('Enter a valid phone number in international format.');
+    e.code = 'auth/invalid-phone-number';
+    throw e;
+  }
+  return A.signInWithPhoneNumber(instance, normalized);
 }
 
 /**
@@ -512,15 +526,33 @@ export async function confirmPhoneCode(confirmation, code) {
     throw e;
   }
   requireAuth();
-
-  const verificationId = confirmation.verificationId;
-  if (verificationId && A.PhoneAuthProvider) {
-    const credential = A.PhoneAuthProvider.credential(verificationId, code);
-    return linkOrSignIn(credential);
+  const normalizedCode = String(code || '').replace(/\D/g, '');
+  if (!/^\d{6}$/.test(normalizedCode)) {
+    const e = new Error('Enter the six-digit code from the SMS.');
+    e.code = 'auth/missing-verification-code';
+    throw e;
   }
 
-  const cred = await confirmation.confirm(code);
-  return { user: cred?.user ?? null, linked: false, mergedIntoExisting: false };
+  const verificationId = confirmation.verificationId;
+  if (verificationId && typeof A.PhoneAuthProvider?.credential === 'function') {
+    try {
+      const credential = A.PhoneAuthProvider.credential(verificationId, normalizedCode);
+      return await linkOrSignIn(credential);
+    } catch (err) {
+      // Some native Android versions surface a bad SMS code as the generic
+      // "invalid credential" error. In this phone-only path it means exactly
+      // the same thing, so preserve a useful retry message for the screen.
+      if (err?.code === 'auth/invalid-credential') {
+        const e = new Error('That code is not right. Check and retry.');
+        e.code = 'auth/invalid-verification-code';
+        throw e;
+      }
+      throw err;
+    }
+  }
+  const e = new Error('Phone verification is unavailable. Request a new code.');
+  e.code = 'app/no-confirmation';
+  throw e;
 }
 
 /**

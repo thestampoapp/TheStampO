@@ -49,11 +49,33 @@ const FIELD_BORDER = '#E3DDEA';
 
 const NEXT_ROUTE = 'Collections';
 const CONTENT_RATIO = 0.873;
-const RESEND_SECONDS = 30;
+const RESEND_SECONDS = 60;
 const CODE_LENGTH = 6;
 
 /** Default dial code. India, matching the app's primary audience. */
 const DEFAULT_DIAL = '+91';
+
+/**
+ * Firebase phone authentication accepts E.164 numbers only. Keep the country
+ * code and local number separate in the UI, then validate the final value
+ * before asking Firebase to send a chargeable SMS.
+ */
+function normalisePhoneNumber(dial, localNumber) {
+  const countryCode = String(dial || '').replace(/\D/g, '');
+  const subscriber = String(localNumber || '').replace(/\D/g, '');
+  const fullNumber = countryCode && subscriber ? `+${countryCode}${subscriber}` : '';
+
+  if (countryCode.length < 1 || countryCode.length > 3 || countryCode.startsWith('0')) {
+    return { error: 'Enter a valid country code.' };
+  }
+  if (subscriber.length < 6) {
+    return { error: 'Enter a valid mobile number.' };
+  }
+  if (fullNumber.length > 16) {
+    return { error: 'That phone number is too long.' };
+  }
+  return { phoneNumber: fullNumber };
+}
 
 const PhoneAuthScreen = ({ navigation }) => {
   const { height: winH } = useWindowDimensions();
@@ -64,12 +86,17 @@ const PhoneAuthScreen = ({ navigation }) => {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
-  const [cooldown, setCooldown] = useState(0);
+  const [resendAt, setResendAt] = useState(null);
+  const [clock, setClock] = useState(Date.now());
+  const [notice, setNotice] = useState(null);
   const [keyboardUp, setKeyboardUp] = useState(false);
   const bottomInset = useBottomInset();
 
   const confirmationRef = useRef(null);
   const codeRef = useRef(null);
+  const requestInFlight = useRef(false);
+  const confirmInFlight = useRef(false);
+  const focusTimer = useRef(null);
   const enter = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -90,12 +117,23 @@ const PhoneAuthScreen = ({ navigation }) => {
     }).start();
   }, [enter]);
 
-  /** Resend countdown. */
+  /**
+   * Derive the countdown from a deadline rather than decrementing a counter.
+   * This stays correct if the app is briefly backgrounded or the JS timer is
+   * delayed by the operating system.
+   */
   useEffect(() => {
-    if (cooldown <= 0) return undefined;
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [cooldown]);
+    if (!resendAt || resendAt <= Date.now()) return undefined;
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [resendAt]);
+
+  useEffect(
+    () => () => {
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+    },
+    []
+  );
 
   /** Hardware back steps back through the flow before leaving. */
   useEffect(() => {
@@ -104,6 +142,8 @@ const PhoneAuthScreen = ({ navigation }) => {
         setStep('phone');
         setCode('');
         setError(null);
+        setNotice(null);
+        confirmationRef.current = null;
         return true;
       }
       navigation.goBack();
@@ -112,60 +152,89 @@ const PhoneAuthScreen = ({ navigation }) => {
     return () => sub.remove();
   }, [step, navigation]);
 
-  const fullNumber = useMemo(
-    () => `${dial}${phone.replace(/[^\d]/g, '')}`,
-    [dial, phone]
-  );
+  const phoneDetails = useMemo(() => normalisePhoneNumber(dial, phone), [dial, phone]);
+  const fullNumber = phoneDetails.phoneNumber || '';
+  const resendSeconds = resendAt
+    ? Math.max(0, Math.ceil((resendAt - clock) / 1000))
+    : 0;
 
   const showHero = !keyboardUp && winH > 700;
 
-  const handleSend = useCallback(async () => {
-    const digits = phone.replace(/[^\d]/g, '');
-    if (digits.length < 6) {
-      setError('Enter a valid phone number');
+  const sendCode = useCallback(async (isResend = false) => {
+    if (busy || requestInFlight.current) return;
+    if (isResend && resendSeconds > 0) return;
+    if (!phoneDetails.phoneNumber) {
+      setError(phoneDetails.error || 'Enter a valid phone number.');
       return;
     }
+
+    requestInFlight.current = true;
     setError(null);
-    const res = await requestCode(fullNumber);
-    if (res.ok) {
-      confirmationRef.current = res.confirmation;
-      setStep('code');
-      setCooldown(RESEND_SECONDS);
-      setTimeout(() => codeRef.current?.focus(), 250);
-    } else if (res.error) {
-      setError(res.error);
+    setNotice(null);
+    try {
+      const res = await requestCode(phoneDetails.phoneNumber);
+      if (res.ok && res.confirmation) {
+        confirmationRef.current = res.confirmation;
+        setCode('');
+        setStep('code');
+        setResendAt(Date.now() + RESEND_SECONDS * 1000);
+        if (isResend) setNotice('A new code has been sent.');
+        if (focusTimer.current) clearTimeout(focusTimer.current);
+        focusTimer.current = setTimeout(() => codeRef.current?.focus(), 250);
+      } else {
+        setError(res.error || 'Unable to send a code. Please try again.');
+      }
+    } finally {
+      requestInFlight.current = false;
     }
-  }, [phone, fullNumber, requestCode]);
+  }, [busy, phoneDetails, requestCode, resendSeconds]);
 
   const handleConfirm = useCallback(
     async (value) => {
+      if (busy || confirmInFlight.current) return;
       const c = (value ?? code).replace(/[^\d]/g, '');
       if (c.length !== CODE_LENGTH) {
         setError(`Enter the ${CODE_LENGTH}-digit code`);
         return;
       }
+      if (!confirmationRef.current) {
+        setError('Request a new code and try again.');
+        return;
+      }
+      confirmInFlight.current = true;
       setError(null);
-      const res = await confirmCode(confirmationRef.current, c);
-      if (res.ok) {
-        // Phone verified => permanent account => onboarding is finished.
-        await setOnboarded(true);
-        navigation.reset({ index: 0, routes: [{ name: NEXT_ROUTE }] });
-      } else if (res.error) setError(res.error);
+      setNotice(null);
+      try {
+        const res = await confirmCode(confirmationRef.current, c);
+        if (res.ok) {
+          // Phone verified => permanent account => onboarding is finished.
+          await setOnboarded(true);
+          navigation.reset({ index: 0, routes: [{ name: NEXT_ROUTE }] });
+        } else {
+          setError(res.error || 'Unable to verify that code. Try again.');
+          if (res.code === 'auth/invalid-verification-code') {
+            setCode('');
+            codeRef.current?.focus();
+          }
+          if (res.code === 'auth/session-expired') {
+            confirmationRef.current = null;
+          }
+        }
+      } finally {
+        confirmInFlight.current = false;
+      }
     },
     [code, confirmCode, navigation]
   );
 
-  /** Auto-submit once all six digits are in -- saves a tap. */
+  /** Manual code entry only. The user chooses when to submit it. */
   const onCodeChange = useCallback(
     (v) => {
       const digits = v.replace(/[^\d]/g, '').slice(0, CODE_LENGTH);
       setCode(digits);
-      if (digits.length === CODE_LENGTH) {
-        Keyboard.dismiss();
-        handleConfirm(digits);
-      }
+      if (error) setError(null);
     },
-    [handleConfirm]
+    [error]
   );
 
   const enterStyle = {
@@ -190,6 +259,8 @@ const PhoneAuthScreen = ({ navigation }) => {
               setStep('phone');
               setCode('');
               setError(null);
+              setNotice(null);
+              confirmationRef.current = null;
             } else {
               navigation.goBack();
             }
@@ -222,9 +293,13 @@ const PhoneAuthScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.dialInput}
                   value={dial}
-                  onChangeText={(v) => setDial(v.startsWith('+') ? v : `+${v}`)}
+                  onChangeText={(v) => {
+                    setDial(`+${v.replace(/\D/g, '').slice(0, 3)}`);
+                    if (error) setError(null);
+                  }}
                   keyboardType="phone-pad"
-                  maxLength={5}
+                  maxLength={4}
+                  accessibilityLabel="Country calling code"
                   underlineColorAndroid="transparent"
                 />
               </View>
@@ -234,7 +309,10 @@ const PhoneAuthScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(v) => {
+                    setPhone(v);
+                    if (error) setError(null);
+                  }}
                   placeholder="98765 43210"
                   placeholderTextColor="#A9A49D"
                   keyboardType="phone-pad"
@@ -243,7 +321,7 @@ const PhoneAuthScreen = ({ navigation }) => {
                   maxLength={15}
                   returnKeyType="done"
                   underlineColorAndroid="transparent"
-                  onSubmitEditing={handleSend}
+                  onSubmitEditing={() => sendCode(false)}
                 />
               </View>
             </View>
@@ -254,7 +332,7 @@ const PhoneAuthScreen = ({ navigation }) => {
 
             <TouchableOpacity
               style={[styles.cta, shadow(3)]}
-              onPress={handleSend}
+              onPress={() => sendCode(false)}
               activeOpacity={0.9}
               disabled={busy}
             >
@@ -263,12 +341,11 @@ const PhoneAuthScreen = ({ navigation }) => {
           </>
         ) : (
           <>
-            {/* Visual boxes over one hidden input: keeps SMS autofill working,
-                which per-digit inputs famously break on Android. */}
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => codeRef.current?.focus()}
               style={styles.codeRow}
+              accessibilityLabel="Six digit verification code"
             >
               {boxes.map((_, i) => (
                 <View
@@ -290,8 +367,7 @@ const PhoneAuthScreen = ({ navigation }) => {
               value={code}
               onChangeText={onCodeChange}
               keyboardType="number-pad"
-              autoComplete="sms-otp"
-              textContentType="oneTimeCode"
+              autoComplete="off"
               maxLength={CODE_LENGTH}
               autoFocus
               caretHidden
@@ -299,6 +375,7 @@ const PhoneAuthScreen = ({ navigation }) => {
 
             <View style={styles.errorSlot}>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
             </View>
 
             <TouchableOpacity
@@ -312,12 +389,12 @@ const PhoneAuthScreen = ({ navigation }) => {
 
             <TouchableOpacity
               style={styles.resend}
-              onPress={handleSend}
-              disabled={cooldown > 0 || busy}
+              onPress={() => sendCode(true)}
+              disabled={resendSeconds > 0 || busy}
               activeOpacity={ACTIVE_OPACITY}
             >
-              <Text style={[styles.resendText, cooldown > 0 && styles.resendOff]}>
-                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+              <Text style={[styles.resendText, resendSeconds > 0 && styles.resendOff]}>
+                {resendSeconds > 0 ? `Resend code in ${resendSeconds}s` : 'Resend code'}
               </Text>
             </TouchableOpacity>
           </>
@@ -425,6 +502,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     includeFontPadding: false,
     color: ACCENT,
+    textAlign: 'center',
+  },
+  noticeText: {
+    fontSize: 13,
+    includeFontPadding: false,
+    color: MUTED,
     textAlign: 'center',
   },
 

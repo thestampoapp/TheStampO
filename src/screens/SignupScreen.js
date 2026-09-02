@@ -500,7 +500,7 @@ const SignupScreen = ({ navigation }) => {
           <View style={styles.rule} />
         </View>
 
-        {/* Social options share a row: two stacked buttons cost 72dp extra */}
+        {/* Google is the only social sign-in option in this release. */}
         <View style={styles.socialRow}>
           <TouchableOpacity
             style={[styles.socialBtn, { height: L.social }]}
@@ -512,16 +512,21 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.socialText}>Google</Text>
           </TouchableOpacity>
 
-          <View style={{ width: 12 }} />
+          {/*
+            Phone OTP is intentionally not part of this release. Keep this
+            entry point beside the retained PhoneAuth screen so it can be
+            restored later without rebuilding the authentication flow.
 
-          <TouchableOpacity
-            style={[styles.socialBtn, { height: L.social }]}
-            activeOpacity={ACTIVE_OPACITY}
-            onPress={() => navigation.navigate('PhoneAuth')}
-          >
-            <Feather name="smartphone" size={18} color={INK} />
-            <Text style={styles.socialText}>Phone</Text>
-          </TouchableOpacity>
+            <View style={{ width: 12 }} />
+            <TouchableOpacity
+              style={[styles.socialBtn, { height: L.social }]}
+              activeOpacity={ACTIVE_OPACITY}
+              onPress={() => navigation.navigate('PhoneAuth')}
+            >
+              <Feather name="smartphone" size={18} color={INK} />
+              <Text style={styles.socialText}>Phone</Text>
+            </TouchableOpacity>
+          */}
         </View>
 
         {/* Pushes the login row to the bottom when there is spare room */}
