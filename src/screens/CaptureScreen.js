@@ -35,21 +35,19 @@ import {
   TouchableOpacity,
   Animated,
   StatusBar,
-  ScrollView,
   Linking,
   AppState,
-  Image,
   useWindowDimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
+// import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { Feather } from '@expo/vector-icons';
 import { useAppDialog } from '../components/AppDialog';
 import { useFocusEffect } from '@react-navigation/native';
 
 import StampRenderer from '../components/StampRenderer';
-import CaptureFrame, { FRAME_OPTIONS, getFrameOption } from '../components/CaptureFrame';
+import CaptureFrame, { getFrameOption } from '../components/CaptureFrame';
 import TabBar from '../components/TabBar';
 import { cropToStamp } from '../utils/cropStamp';
 import { punchTap, lightTap } from '../utils/haptics';
@@ -66,15 +64,15 @@ import {
 const FILL_DEFAULT = 0.66;
 const FILL_MIN = 0.44;
 const FILL_MAX = 0.9;
-const FRAME_KEY = 'stampo.capture.frame';
+// const FRAME_KEY = 'stampo.capture.frame';
 
-let AsyncStorage = null;
-try {
-  // eslint-disable-next-line global-require
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
-} catch (e) {
-  AsyncStorage = null;
-}
+// let AsyncStorage = null;
+// try {
+//   // eslint-disable-next-line global-require
+//   AsyncStorage = require('@react-native-async-storage/async-storage').default;
+// } catch (e) {
+//   AsyncStorage = null;
+// }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -89,8 +87,10 @@ const CaptureScreen = ({ navigation }) => {
   const [isPunching, setIsPunching] = useState(false);
   const [capturedUri, setCapturedUri] = useState(null);
   const [fill, setFill] = useState(FILL_DEFAULT);
-  const [frameId, setFrameId] = useState('steel');
-  const [framePickerOpen, setFramePickerOpen] = useState(false);
+  const frameId = 'steel';
+  /** Fancy frame picker disabled — only the default steel puncher is active. */
+  // const [frameId, setFrameId] = useState('steel');
+  // const [framePickerOpen, setFramePickerOpen] = useState(false);
   /** 'off' | 'on' | 'auto' -- matches expo-camera's flash prop. */
   const [flashMode, setFlashMode] = useState('off');
 
@@ -111,25 +111,26 @@ const CaptureScreen = ({ navigation }) => {
   const eject = useRef(new Animated.Value(0)).current;
   const hint = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    let alive = true;
-    AsyncStorage?.getItem(FRAME_KEY)
-      .then((saved) => {
-        if (alive && FRAME_OPTIONS.some((frame) => frame.id === saved)) {
-          setFrameId(saved);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // Frame preference persistence disabled while only one puncher is available.
+  // useEffect(() => {
+  //   let alive = true;
+  //   AsyncStorage?.getItem(FRAME_KEY)
+  //     .then((saved) => {
+  //       if (alive && FRAME_OPTIONS.some((frame) => frame.id === saved)) {
+  //         setFrameId(saved);
+  //       }
+  //     })
+  //     .catch(() => {});
+  //   return () => {
+  //     alive = false;
+  //   };
+  // }, []);
 
-  const selectFrame = useCallback((id) => {
-    setFrameId(id);
-    lightTap();
-    AsyncStorage?.setItem(FRAME_KEY, id).catch(() => {});
-  }, []);
+  // const selectFrame = useCallback((id) => {
+  //   setFrameId(id);
+  //   lightTap();
+  //   AsyncStorage?.setItem(FRAME_KEY, id).catch(() => {});
+  // }, []);
 
   const activeFrame = useMemo(() => getFrameOption(frameId), [frameId]);
 
@@ -362,26 +363,27 @@ const CaptureScreen = ({ navigation }) => {
    * CaptureSave -- the same destination as a punch -- so both entry points
    * converge on one flow.
    */
-  const openGallery = useCallback(async () => {
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        showDialog({ title: 'Permission needed', message: 'Please allow photo access to upload.' });
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 1,
-        allowsEditing: false,
-      });
-      if (!result.canceled && result.assets?.length) {
-        lightTap();
-        navigation.navigate('CaptureSave', { photoUri: result.assets[0].uri });
-      }
-    } catch (e) {
-      showDialog({ title: 'Upload failed', message: 'Could not open your photo library.' });
-    }
-  }, [navigation, showDialog]);
+  // Gallery upload disabled for now.
+  // const openGallery = useCallback(async () => {
+  //   try {
+  //     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  //     if (!perm.granted) {
+  //       showDialog({ title: 'Permission needed', message: 'Please allow photo access to upload.' });
+  //       return;
+  //     }
+  //     const result = await ImagePicker.launchImageLibraryAsync({
+  //       mediaTypes: ['images'],
+  //       quality: 1,
+  //       allowsEditing: false,
+  //     });
+  //     if (!result.canceled && result.assets?.length) {
+  //       lightTap();
+  //       navigation.navigate('CaptureSave', { photoUri: result.assets[0].uri });
+  //     }
+  //   } catch (e) {
+  //     showDialog({ title: 'Upload failed', message: 'Could not open your photo library.' });
+  //   }
+  // }, [navigation, showDialog]);
 
   const runFlash = useCallback(() => {
     flash.setValue(0);
@@ -558,9 +560,9 @@ const CaptureScreen = ({ navigation }) => {
         </View>
       ) : null}
 
-      {/* Top row: gallery + flash. These are "setup" actions, kept away from
-          the shutter so they cannot be hit by accident mid-shot. */}
+      {/* Top row: flash. Gallery upload disabled for now. */}
       <View style={styles.topBar} pointerEvents="box-none">
+        {/*
         <TouchableOpacity
           style={styles.roundBtn}
           onPress={openGallery}
@@ -569,6 +571,7 @@ const CaptureScreen = ({ navigation }) => {
         >
           <Feather name="image" size={20} color="#fff" />
         </TouchableOpacity>
+        */}
 
         <TouchableOpacity
           style={[styles.roundBtn, flashMode !== 'off' && styles.roundBtnOn]}
@@ -585,6 +588,8 @@ const CaptureScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Fancy frame picker disabled — default steel puncher only. */}
+      {/*
       <TouchableOpacity
         style={styles.frameToggle}
         onPress={() => setFramePickerOpen((open) => !open)}
@@ -622,13 +627,12 @@ const CaptureScreen = ({ navigation }) => {
           </ScrollView>
         </View>
       ) : null}
+      */}
 
       {/* Bottom row: zoom / shutter / flip on one axis, so the two controls
           used while framing sit within thumb reach of the shutter. */}
       <View style={[styles.bottomArea, { bottom: TAB_SPACE + bottomInset }]} pointerEvents="box-none">
-        {!framePickerOpen ? (
-          <Animated.Text style={[styles.hint, { opacity: hint }]}>Pinch to resize</Animated.Text>
-        ) : null}
+        <Animated.Text style={[styles.hint, { opacity: hint }]}>Pinch to resize</Animated.Text>
 
         <View style={styles.shutterRow}>
           <TouchableOpacity

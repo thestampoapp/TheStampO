@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, SafeAreaView, StatusBar} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Button } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const IntroItem = ({ icon, title, description }) => (
   <View style={styles.item}>
@@ -30,55 +31,32 @@ const CameraIntroScreen = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '95%' }]} />
+    <OnboardingStepLayout
+      progressWidth="95%"
+      contentContainerStyle={styles.scrollContent}
+      footer={<Button title="Continue" onPress={() => navigation.navigate('Camera')} />}
+    >
+      <View style={styles.iconCircle}>
+        <Text style={styles.cameraIcon}>📷</Text>
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.cameraIcon}>📷</Text>
-        </View>
+      <Text style={styles.title}>Ready to capture your first stamp?</Text>
+      <Text style={styles.subtitle}>
+        StampO uses your camera to frame the world through a stamp-shaped viewfinder
+      </Text>
 
-        <Text style={styles.title}>Ready to capture your first stamp?</Text>
-        <Text style={styles.subtitle}>StampO uses your camera to frame the world through a stamp-shaped viewfinder</Text>
-
-        <View style={styles.list}>
-          {items.map((item, i) => (
-            <IntroItem key={i} {...item} />
-          ))}
-        </View>
-
-        <Button 
-          title="Continue" 
-          onPress={() => navigation.navigate('Camera')} 
-        />
+      <View style={styles.list}>
+        {items.map((item, i) => (
+          <IntroItem key={i} {...item} />
+        ))}
       </View>
-    </SafeAreaView>
+    </OnboardingStepLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  content: {
-    flex: 1,
-    padding: SPACING.xl,
-    alignItems: 'center',
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   iconCircle: {
@@ -113,7 +91,6 @@ const styles = StyleSheet.create({
   },
   list: {
     width: '100%',
-    marginBottom: SPACING.xl * 2,
   },
   item: {
     flexDirection: 'row',

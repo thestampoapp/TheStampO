@@ -28,6 +28,8 @@
  * handlers where a rejected promise becomes an unhandled rejection.
  */
 
+import { Image, Platform } from 'react-native';
+
 import { STAMP } from './stampGeometry';
 
 let MediaLibrary = null;
@@ -66,6 +68,9 @@ const framedShareCache = new Map();
 
 /** 3x the canonical stamp width -- crisp when printed or zoomed. */
 export const CAPTURE_WIDTH = STAMP.OUTER_WIDTH * 3;
+export const CAPTURE_HEIGHT = Math.round(
+  CAPTURE_WIDTH * (STAMP.OUTER_HEIGHT / STAMP.OUTER_WIDTH)
+);
 
 export function isSaveAvailable() {
   return !!MediaLibrary;
@@ -81,6 +86,75 @@ export function isShareAvailable() {
 
 export function hasCachedFramedShare(cacheKey) {
   return !!cacheKey && framedShareCache.has(cacheKey);
+}
+
+/** iOS drawViewHierarchyInRect often misses SVG/async images; renderInContext is safer. */
+const IOS_CAPTURE_OPTS =
+  Platform.OS === 'ios' ? { useRenderInContext: true } : {};
+
+/**
+ * Gate that resolves once StampRenderer reports its photo bitmap is ready.
+ * ViewShot does not wait for SvgImage/Skia decode — without this, iOS captures
+ * show the white frame with a blank interior.
+ */
+export function createImageReadyGate() {
+  let resolve = () => {};
+  let settled = false;
+  let promise = new Promise((r) => {
+    resolve = r;
+  });
+
+  return {
+    reset() {
+      settled = false;
+      promise = new Promise((r) => {
+        resolve = r;
+      });
+    },
+    notify() {
+      if (settled) return;
+      settled = true;
+      resolve();
+    },
+    wait(timeoutMs = 8000) {
+      return Promise.race([
+        promise,
+        new Promise((resolveTimeout) => setTimeout(resolveTimeout, timeoutMs)),
+      ]);
+    },
+  };
+}
+
+async function waitForCapturePaint(uri, readyGate) {
+  if (uri) {
+    try {
+      await Image.prefetch(uri);
+    } catch (e) {
+      /* local file:// URIs can still paint without prefetch */
+    }
+  }
+
+  if (readyGate) {
+    await readyGate.wait();
+  }
+
+  // Two frames so layout + async SVG/Skia paint finish before snapshot.
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  if (Platform.OS === 'ios') {
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+async function captureView(viewRef, uri, readyGate) {
+  await waitForCapturePaint(uri, readyGate);
+
+  return ViewShot.captureRef(viewRef, {
+    format: 'png',
+    quality: 1,
+    result: 'tmpfile',
+    ...IOS_CAPTURE_OPTS,
+  });
 }
 
 /**
@@ -145,7 +219,7 @@ async function fileToGallery(uri) {
  * @param {object} viewRef  ref to the view holding a StampRenderer
  * @returns {Promise<{ok: boolean, error?: string, uri?: string}>}
  */
-export async function saveStampView(viewRef) {
+export async function saveStampView(viewRef, uri, readyGate) {
   if (!isCaptureAvailable()) {
     return {
       ok: false,
@@ -161,11 +235,7 @@ export async function saveStampView(viewRef) {
 
   try {
     // PNG, not JPG: the area outside the scallops must stay transparent.
-    const shot = await ViewShot.captureRef(viewRef, {
-      format: 'png',
-      quality: 1,
-      result: 'tmpfile',
-    });
+    const shot = await captureView(viewRef, uri, readyGate);
 
     await fileToGallery(shot);
     return { ok: true, uri: shot };
@@ -181,7 +251,7 @@ export async function saveStampView(viewRef) {
  * Save the complete photo inside a white, scalloped stamp frame as PNG.
  * The rendered view uses a `contain` fit, so the source photo is never cropped.
  */
-export async function saveFramedStampView(viewRef) {
+export async function saveFramedStampView(viewRef, uri, readyGate) {
   if (!isCaptureAvailable()) {
     return {
       ok: false,
@@ -196,11 +266,7 @@ export async function saveFramedStampView(viewRef) {
   if (!perm.ok) return perm;
 
   try {
-    const shot = await ViewShot.captureRef(viewRef, {
-      format: 'png',
-      quality: 1,
-      result: 'tmpfile',
-    });
+    const shot = await captureView(viewRef, uri, readyGate);
 
     await fileToGallery(shot);
     return { ok: true, uri: shot };
@@ -216,7 +282,7 @@ export async function saveFramedStampView(viewRef) {
  * Render and share the same framed PNG used by "Save as PNG". The Android
  * system share sheet decides which installed compatible apps to show.
  */
-export async function shareFramedStampView(viewRef, cacheKey) {
+export async function shareFramedStampView(viewRef, cacheKey, uri, readyGate) {
   if (!isCaptureAvailable()) {
     return {
       ok: false,
@@ -240,11 +306,7 @@ export async function shareFramedStampView(viewRef, cacheKey) {
       if (!viewRef?.current) {
         return { ok: false, error: 'Nothing to share yet. Try again in a moment.' };
       }
-      shot = await ViewShot.captureRef(viewRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
+      shot = await captureView(viewRef, uri, readyGate);
       if (cacheKey) framedShareCache.set(cacheKey, shot);
     }
 

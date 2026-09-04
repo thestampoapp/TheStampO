@@ -36,6 +36,14 @@ import { useAuth } from '../data/authStore';
 import { useStamps } from '../data/stampStore';
 import { isPro, subscribe as subscribeTier } from '../data/subscriptionStore';
 import { MONETIZATION_ENABLED } from '../data/monetization';
+import {
+  getPushPermissionStatus,
+  registerForPushNotifications,
+  scheduleLocalTestNotification,
+  openNotificationSettings,
+  IS_PUSH_AVAILABLE,
+} from '../notifications/pushNotifications';
+import { getStoredPushToken } from '../data/notificationStore';
 import { STAMP_COLORS } from '../styles/stampTheme';
 import {
   weight,
@@ -164,10 +172,29 @@ const AccountScreen = ({ navigation }) => {
   const [prompt, setPrompt] = useState(null); // 'password' | 'email' | 'delete'
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [pushStatus, setPushStatus] = useState('undetermined');
+  const [pushToken, setPushToken] = useState(null);
+  const [pushBusy, setPushBusy] = useState(false);
   /** Re-render when the tier changes (e.g. returning from Subscribe). */
   const [tierTick, setTierTick] = useState(0);
 
   useEffect(() => subscribeTier(() => setTierTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [status, token] = await Promise.all([
+        getPushPermissionStatus(),
+        getStoredPushToken(),
+      ]);
+      if (cancelled) return;
+      setPushStatus(status);
+      setPushToken(token);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // While the app ships free the tier is forced to "free" so no Pro surface
   // can appear; flipping MONETIZATION_ENABLED restores the real check.
@@ -180,6 +207,66 @@ const AccountScreen = ({ navigation }) => {
     setPrompt(null);
     setError(null);
   }, []);
+
+  const pushStatusLabel = useMemo(() => {
+    if (!IS_PUSH_AVAILABLE) return 'Not available in this build';
+    if (pushStatus === 'granted') return pushToken ? 'Enabled' : 'Enabled (registering…)';
+    if (pushStatus === 'denied') return 'Off — open Settings';
+    return 'Tap to enable';
+  }, [pushStatus, pushToken]);
+
+  const handleNotifications = useCallback(async () => {
+    if (!IS_PUSH_AVAILABLE || pushBusy) return;
+
+    if (pushStatus === 'denied') {
+      openNotificationSettings();
+      return;
+    }
+
+    if (pushStatus === 'granted' && pushToken) {
+      if (__DEV__) {
+        setPushBusy(true);
+        const test = await scheduleLocalTestNotification();
+        setPushBusy(false);
+        showDialog(
+          test.ok
+            ? { title: 'Test sent', message: 'You should see a notification in a couple of seconds.' }
+            : { title: 'Could not test', message: test.error || 'Try again.' }
+        );
+      }
+      return;
+    }
+
+    setPushBusy(true);
+    const res = await registerForPushNotifications();
+    setPushBusy(false);
+
+    if (res.ok) {
+      setPushStatus('granted');
+      setPushToken(res.token || null);
+      showDialog({
+        title: 'Notifications enabled',
+        message:
+          'You will be able to receive reminders and updates from TheStampO on this iPhone.',
+      });
+      return;
+    }
+
+    if (res.status === 'denied') {
+      setPushStatus('denied');
+    }
+
+    showDialog({
+      title: 'Could not enable notifications',
+      message: res.error || 'Please try again.',
+      actions: res.status === 'denied'
+        ? [
+            { label: 'Cancel', variant: 'secondary' },
+            { label: 'Open Settings', onPress: openNotificationSettings },
+          ]
+        : undefined,
+    });
+  }, [pushBusy, pushStatus, pushToken, showDialog]);
 
   const handleTab = useCallback(
     (tab) => {
@@ -382,6 +469,16 @@ const AccountScreen = ({ navigation }) => {
             <Text style={styles.subscribeText}>Remove ads</Text>
           </TouchableOpacity>
         ) : null}
+
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={[styles.card, shadow(1)]}>
+          <Row
+            icon="bell"
+            label="Push notifications"
+            value={pushBusy ? 'Working…' : pushStatusLabel}
+            onPress={handleNotifications}
+          />
+        </View>
 
         {/* Account actions */}
         <Text style={styles.sectionTitle}>Account</Text>

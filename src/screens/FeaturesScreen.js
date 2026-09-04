@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Animated, StatusBar} from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Button } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const FeatureItem = ({ icon, label, description }) => (
   <View style={styles.featureItem}>
@@ -52,52 +53,24 @@ const FeaturesScreen = ({ navigation }) => {
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-      <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: '70%' }]} />
+      <OnboardingStepLayout
+        progressWidth="70%"
+        footer={<Button title="Continue" onPress={() => navigation.navigate('Interests')} />}
+      >
+        <Text style={styles.title}>A better way to capture memories</Text>
+        <Text style={styles.subtitle}>Here's how StampO helps</Text>
+
+        <View style={styles.featuresList}>
+          {features.map((f, i) => (
+            <FeatureItem key={i} {...f} />
+          ))}
         </View>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>A better way to capture memories</Text>
-          <Text style={styles.subtitle}>Here's how StampO helps</Text>
-
-          <View style={styles.featuresList}>
-            {features.map((f, i) => (
-              <FeatureItem key={i} {...f} />
-            ))}
-          </View>
-
-          <Button 
-            title="Continue" 
-            onPress={() => navigation.navigate('Interests')} 
-          />
-        </ScrollView>
-      </SafeAreaView>
+      </OnboardingStepLayout>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  scrollContent: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
   title: {
     fontSize: 32,
     includeFontPadding: false,
@@ -119,7 +92,6 @@ const styles = StyleSheet.create({
   },
   featuresList: {
     width: '100%',
-    marginBottom: SPACING.xl * 2,
   },
   featureItem: {
     flexDirection: 'row',

@@ -20,7 +20,7 @@
  * There is no third path, no frame PNG, and no rectangular fallback.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Path, Defs, ClipPath, Image as SvgImage, G } from 'react-native-svg';
 
@@ -48,7 +48,7 @@ export const IS_SKIA_ENABLED = !!Skia;
 // Skia implementation
 // ---------------------------------------------------------------------------
 
-function SkiaStamp({ layout, uri }) {
+function SkiaStamp({ layout, uri, onImageReady }) {
   const {
     Canvas,
     Group,
@@ -68,6 +68,14 @@ function SkiaStamp({ layout, uri }) {
   );
 
   const image = useImage(uri);
+
+  useEffect(() => {
+    if (!uri) {
+      onImageReady?.();
+      return;
+    }
+    if (image) onImageReady?.();
+  }, [uri, image, onImageReady]);
 
   // Padding so the blurred shadow is not clipped by the canvas bounds.
   const pad = 34;
@@ -113,7 +121,7 @@ function SkiaStamp({ layout, uri }) {
 // SVG implementation (same geometry, same result)
 // ---------------------------------------------------------------------------
 
-function SvgStamp({ layout, uri, clipId }) {
+function SvgStamp({ layout, uri, clipId, onImageReady }) {
   const { outerWidth, outerHeight, path } = layout;
 
   return (
@@ -138,6 +146,7 @@ function SvgStamp({ layout, uri, clipId }) {
               width={outerWidth}
               height={outerHeight}
               preserveAspectRatio="xMidYMid slice"
+              onLoad={onImageReady}
             />
           </G>
         ) : null}
@@ -152,7 +161,7 @@ function SvgStamp({ layout, uri, clipId }) {
  * intentional here; unlike the normal stamp, this variant must never crop
  * the source photo.
  */
-function SvgFramedStamp({ layout, uri }) {
+function SvgFramedStamp({ layout, uri, onImageReady }) {
   const { outerWidth, outerHeight, scale, path } = layout;
   // A slightly wider white mat around the complete photo than the standard
   // stamp renderer uses. This is intentionally limited to the framed PNG.
@@ -181,6 +190,7 @@ function SvgFramedStamp({ layout, uri }) {
             width={innerWidth}
             height={innerHeight}
             preserveAspectRatio="xMidYMid meet"
+            onLoad={onImageReady}
           />
         </G>
       </Svg>
@@ -205,6 +215,9 @@ function StampRenderer({
   width = STAMP.OUTER_WIDTH,
   rotation = STAMP.ROTATION,
   framed = false,
+  /** ViewShot on iOS is unreliable with Skia; export paths force SVG. */
+  forceSvg = false,
+  onImageReady,
   style,
   ...rest
 }) {
@@ -223,6 +236,18 @@ function StampRenderer({
 
   const layout = useMemo(() => getStampLayout(width), [width]);
   const clipId = useMemo(() => `stampClip${(uid += 1)}`, []);
+  const readyFired = useRef(false);
+
+  const notifyImageReady = useCallback(() => {
+    if (readyFired.current) return;
+    readyFired.current = true;
+    onImageReady?.();
+  }, [onImageReady]);
+
+  useEffect(() => {
+    readyFired.current = false;
+    if (!uri) notifyImageReady();
+  }, [uri, framed, width, notifyImageReady]);
 
   const containerStyle = useMemo(
     () => [
@@ -236,11 +261,16 @@ function StampRenderer({
   return (
     <View style={containerStyle} pointerEvents="none">
       {framed ? (
-        <SvgFramedStamp layout={layout} uri={uri} />
-      ) : IS_SKIA_ENABLED ? (
-        <SkiaStamp layout={layout} uri={uri} />
+        <SvgFramedStamp layout={layout} uri={uri} onImageReady={notifyImageReady} />
+      ) : forceSvg || !IS_SKIA_ENABLED ? (
+        <SvgStamp
+          layout={layout}
+          uri={uri}
+          clipId={clipId}
+          onImageReady={notifyImageReady}
+        />
       ) : (
-        <SvgStamp layout={layout} uri={uri} clipId={clipId} />
+        <SkiaStamp layout={layout} uri={uri} onImageReady={notifyImageReady} />
       )}
     </View>
   );

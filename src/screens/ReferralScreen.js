@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, StatusBar} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Button, OptionItem } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const ReferralScreen = ({ navigation }) => {
   const [selected, setSelected] = useState(null);
@@ -19,60 +20,37 @@ const ReferralScreen = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '20%' }]} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>How did you hear about us?</Text>
-        <Text style={styles.subtitle}>We'd love to know what brought you here</Text>
-
-        <View style={styles.optionsContainer}>
-          {options.map((opt) => (
-            <OptionItem 
-              key={opt.id}
-              label={opt.label}
-              icon={<Text style={styles.iconText}>{opt.icon}</Text>}
-              selected={selected === opt.id}
-              onPress={() => setSelected(opt.id)}
-            />
-          ))}
-        </View>
-
-        <Button 
-          title="Continue" 
+    <OnboardingStepLayout
+      progressWidth="20%"
+      footer={
+        <Button
+          title="Continue"
           variant="secondary"
           style={selected ? styles.activeButton : styles.disabledButton}
           textStyle={selected ? styles.activeButtonText : null}
-          onPress={() => selected && navigation.navigate('Excitement')} 
+          onPress={() => selected && navigation.navigate('Excitement')}
         />
-      </ScrollView>
-    </SafeAreaView>
+      }
+    >
+      <Text style={styles.title}>How did you hear about us?</Text>
+      <Text style={styles.subtitle}>We'd love to know what brought you here</Text>
+
+      <View style={styles.optionsContainer}>
+        {options.map((opt) => (
+          <OptionItem
+            key={opt.id}
+            label={opt.label}
+            icon={<Text style={styles.iconText}>{opt.icon}</Text>}
+            selected={selected === opt.id}
+            onPress={() => setSelected(opt.id)}
+          />
+        ))}
+      </View>
+    </OnboardingStepLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  scrollContent: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
   title: {
     fontSize: 32,
     includeFontPadding: false,
@@ -94,7 +72,6 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     width: '100%',
-    marginBottom: SPACING.xl,
   },
   iconText: {
     fontSize: 20,

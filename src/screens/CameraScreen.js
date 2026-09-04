@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Audio } from 'expo-av';
-import * as ImagePicker from 'expo-image-picker';
+// import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useAppDialog } from '../components/AppDialog';
 import { useFocusEffect } from '@react-navigation/native';
@@ -362,28 +362,29 @@ const CameraScreen = ({ navigation }) => {
     setFacing((f) => (f === 'back' ? 'front' : 'back'));
   }, []);
 
-  const handleUpload = useCallback(async () => {
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        showDialog({ title: 'Permission needed', message: 'Please allow photo access to upload.' });
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        // `MediaTypeOptions` is deprecated; the array form is the new API.
-        mediaTypes: ['images'],
-        quality: 1,
-        allowsEditing: false,
-      });
-      if (!result.canceled && result.assets?.length) {
-        // No additional processing: straight to StampDetail.
-        lightTap();
-        navigation.navigate('StampDetail', { photoUri: result.assets[0].uri });
-      }
-    } catch (e) {
-      showDialog({ title: 'Upload failed', message: 'Could not open your photo library.' });
-    }
-  }, [navigation, showDialog]);
+  // Gallery upload disabled for now.
+  // const handleUpload = useCallback(async () => {
+  //   try {
+  //     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  //     if (!perm.granted) {
+  //       showDialog({ title: 'Permission needed', message: 'Please allow photo access to upload.' });
+  //       return;
+  //     }
+  //     const result = await ImagePicker.launchImageLibraryAsync({
+  //       // `MediaTypeOptions` is deprecated; the array form is the new API.
+  //       mediaTypes: ['images'],
+  //       quality: 1,
+  //       allowsEditing: false,
+  //     });
+  //     if (!result.canceled && result.assets?.length) {
+  //       // No additional processing: straight to StampDetail.
+  //       lightTap();
+  //       navigation.navigate('StampDetail', { photoUri: result.assets[0].uri });
+  //     }
+  //   } catch (e) {
+  //     showDialog({ title: 'Upload failed', message: 'Could not open your photo library.' });
+  //   }
+  // }, [navigation, showDialog]);
 
   const handlePunch = useCallback(async () => {
     if (!cameraRef.current || isPunching) return;
@@ -654,12 +655,17 @@ const CameraScreen = ({ navigation }) => {
       ) : null}
 
       <View style={[styles.bottomBar, { height: chrome.bottom }]}>
+        {/* Gallery upload disabled for now — spacer keeps the punch button centred. */}
+        <View style={styles.sideButton} />
+
+        {/*
         <TouchableOpacity style={styles.sideButton} onPress={handleUpload}>
           <View style={styles.sideIcon}>
             <Feather name="image" size={22} color="#777" />
           </View>
           <Text style={styles.sideLabel}>Upload</Text>
         </TouchableOpacity>
+        */}
 
         <TouchableOpacity
           style={styles.captureOuter}
