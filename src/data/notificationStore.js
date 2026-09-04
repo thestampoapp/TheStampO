@@ -15,6 +15,7 @@ try {
 }
 
 const TOKEN_KEY = '@stampa/pushToken/v1';
+const REMINDER_IDS_KEY = '@stampa/streakReminderIds/v1';
 
 let cachedToken = null;
 let loaded = false;
@@ -52,4 +53,30 @@ export async function savePushToken(token) {
 
 export async function clearPushToken() {
   await savePushToken(null);
+}
+
+/** Notification request IDs are persisted so old reminders can be replaced. */
+export async function getStoredReminderIds() {
+  try {
+    if (!AsyncStorage) return [];
+    const raw = await AsyncStorage.getItem(REMINDER_IDS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function saveReminderIds(ids) {
+  try {
+    if (!AsyncStorage) return;
+    const clean = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    if (clean.length) {
+      await AsyncStorage.setItem(REMINDER_IDS_KEY, JSON.stringify(clean));
+    } else {
+      await AsyncStorage.removeItem(REMINDER_IDS_KEY);
+    }
+  } catch (e) {
+    /* reminders still work for this session */
+  }
 }

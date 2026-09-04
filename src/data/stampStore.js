@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import * as FileSystem from 'expo-file-system';
+import { syncStampReminders } from '../notifications/pushNotifications';
 
 /**
  * AsyncStorage is resolved lazily.
@@ -202,7 +203,9 @@ export function setStampOwner(uid) {
   owner = next;
   cache = null;
   notify();
-  loadStamps();
+  loadStamps()
+    .then((list) => syncStampReminders(list))
+    .catch(() => {});
 }
 
 /**
@@ -243,7 +246,9 @@ export async function addStamp({
   };
 
   const list = await loadStamps();
-  await writeIndex(sortStamps([stamp, ...list]));
+  const next = sortStamps([stamp, ...list]);
+  await writeIndex(next);
+  syncStampReminders(next).catch(() => {});
   return stamp;
 }
 
@@ -266,7 +271,9 @@ export async function deleteStamps(ids) {
   const list = await loadStamps();
   const removed = list.filter((s) => kill.has(s.id));
 
-  await writeIndex(list.filter((s) => !kill.has(s.id)));
+  const next = list.filter((s) => !kill.has(s.id));
+  await writeIndex(next);
+  syncStampReminders(next).catch(() => {});
 
   // Reclaim disk; a failure here is not worth surfacing.
   removed.forEach((s) => {

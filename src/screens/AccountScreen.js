@@ -42,6 +42,7 @@ import {
   scheduleLocalTestNotification,
   openNotificationSettings,
   IS_PUSH_AVAILABLE,
+  syncStampReminders,
 } from '../notifications/pushNotifications';
 import { getStoredPushToken } from '../data/notificationStore';
 import { STAMP_COLORS } from '../styles/stampTheme';
@@ -210,7 +211,7 @@ const AccountScreen = ({ navigation }) => {
 
   const pushStatusLabel = useMemo(() => {
     if (!IS_PUSH_AVAILABLE) return 'Not available in this build';
-    if (pushStatus === 'granted') return pushToken ? 'Enabled' : 'Enabled (registering…)';
+    if (pushStatus === 'granted') return pushToken ? 'Enabled' : 'Enabled on this device';
     if (pushStatus === 'denied') return 'Off — open Settings';
     return 'Tap to enable';
   }, [pushStatus, pushToken]);
@@ -223,7 +224,7 @@ const AccountScreen = ({ navigation }) => {
       return;
     }
 
-    if (pushStatus === 'granted' && pushToken) {
+    if (pushStatus === 'granted') {
       if (__DEV__) {
         setPushBusy(true);
         const test = await scheduleLocalTestNotification();
@@ -244,10 +245,11 @@ const AccountScreen = ({ navigation }) => {
     if (res.ok) {
       setPushStatus('granted');
       setPushToken(res.token || null);
+      await syncStampReminders(stamps);
       showDialog({
         title: 'Notifications enabled',
         message:
-          'You will be able to receive reminders and updates from TheStampO on this iPhone.',
+          'Afternoon and evening stamp reminders are scheduled on this device.',
       });
       return;
     }
@@ -266,7 +268,7 @@ const AccountScreen = ({ navigation }) => {
           ]
         : undefined,
     });
-  }, [pushBusy, pushStatus, pushToken, showDialog]);
+  }, [pushBusy, pushStatus, showDialog, stamps]);
 
   const handleTab = useCallback(
     (tab) => {

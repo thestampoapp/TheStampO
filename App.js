@@ -11,9 +11,11 @@ import { MONETIZATION_ENABLED } from './src/data/monetization';
 import {
   configureNotificationHandler,
   addNotificationListeners,
-  ensurePushRegistration,
+  registerForPushNotifications,
+  syncStampReminders,
 } from './src/notifications/pushNotifications';
 import { loadPushToken } from './src/data/notificationStore';
+import { loadStamps } from './src/data/stampStore';
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import ReferralScreen from './src/screens/ReferralScreen';
@@ -92,8 +94,16 @@ export default function App() {
       },
     });
 
-    // Silently refresh the token when permission was granted in a prior session.
-    ensurePushRegistration().catch(() => {});
+    // Request immediately on first launch. Android 13+ and iOS show their
+    // native prompt; older Android versions report their install-time state.
+    Promise.all([registerForPushNotifications(), loadStamps()])
+      .then(([registration, stamps]) => {
+        if (registration?.status === 'granted' || registration?.ok) {
+          return syncStampReminders(stamps);
+        }
+        return null;
+      })
+      .catch(() => {});
 
     return removeListeners;
   }, []);

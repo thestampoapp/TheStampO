@@ -36,13 +36,11 @@ import {
   Easing,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import StampRenderer from '../components/StampRenderer';
 import SaveStampSheet from '../components/SaveStampSheet';
@@ -85,7 +83,6 @@ const formatDate = (ts) => {
 const StampViewerScreen = ({ navigation, route }) => {
   const { showDialog } = useAppDialog();
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const { stamps } = useStamps();
   const bottomInset = useBottomInset();
 
@@ -108,7 +105,6 @@ const StampViewerScreen = ({ navigation, route }) => {
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
-  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const listRef = useRef(null);
   const shareStageRef = useRef(null);
@@ -121,30 +117,6 @@ const StampViewerScreen = ({ navigation, route }) => {
   useEffect(() => {
     shareReadyGate.current.reset();
   }, [current?.id, current?.uri]);
-
-  useEffect(() => {
-    if (!editing) {
-      setKeyboardInset(0);
-      return;
-    }
-
-    const updateInset = (e) => {
-      setKeyboardInset(e.endCoordinates?.height ?? 0);
-    };
-    const clearInset = () => setKeyboardInset(0);
-
-    const showEvent =
-      Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
-    const hideEvent =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, updateInset);
-    const hideSub = Keyboard.addListener(hideEvent, clearInset);
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [editing]);
 
   useEffect(() => {
     Animated.timing(sheet, {
@@ -421,7 +393,7 @@ const StampViewerScreen = ({ navigation, route }) => {
         <KeyboardAvoidingView
           style={styles.modalWrap}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+          keyboardVerticalOffset={0}
         >
           <TouchableOpacity
             style={styles.scrim}
@@ -431,9 +403,7 @@ const StampViewerScreen = ({ navigation, route }) => {
           <Animated.View
             style={[
               styles.sheet,
-              {
-                paddingBottom: 18 + bottomInset + keyboardInset,
-              },
+              { paddingBottom: 18 + bottomInset },
               {
                 opacity: sheet,
                 transform: [
@@ -456,10 +426,7 @@ const StampViewerScreen = ({ navigation, route }) => {
               showsVerticalScrollIndicator={false}
             >
               <TextInput
-                style={[
-                  styles.sheetInput,
-                  keyboardInset > 0 && styles.sheetInputCompact,
-                ]}
+                style={styles.sheetInput}
                 value={draft}
                 onChangeText={(v) => setDraft(v.slice(0, NOTE_MAX))}
                 placeholder="What made this moment worth keeping?"
@@ -528,7 +495,9 @@ const styles = StyleSheet.create({
     left: -10000,
     top: 0,
   },
-  shareStage: { backgroundColor: '#FFFFFF' },
+  // The stamp draws its own white paper border; the area outside its
+  // scalloped silhouette must stay transparent in the shared PNG.
+  shareStage: { backgroundColor: 'transparent' },
   shareStageSized: {
     width: CAPTURE_WIDTH,
     height: CAPTURE_HEIGHT,
@@ -633,6 +602,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 22,
     paddingHorizontal: 22,
     paddingTop: 10,
+    maxHeight: '70%',
     ...shadow(4),
   },
   grabber: {
@@ -664,10 +634,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     includeFontPadding: false,
     color: STAMP_COLORS.textPrimary,
-  },
-  sheetInputCompact: {
-    minHeight: 72,
-    maxHeight: 120,
   },
   sheetCounter: {
     alignSelf: 'flex-end',

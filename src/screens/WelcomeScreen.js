@@ -19,9 +19,18 @@ const WelcomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
-  // Keep the hero proportional but never tall enough to push the CTA off-screen.
-  const heroWidth = Math.min(width * 0.88, 380);
-  const heroHeight = Math.min(heroWidth * 1.12, height * 0.42, 340);
+  // The source artwork is portrait (1024x1536). Android previously put it in
+  // a 1:1.12 box, so `contain` had to shrink it until it looked tiny. Give
+  // Android a box matching the actual 1:1.5 ratio. The CTA remains outside
+  // the flexible image area and therefore stays pinned at the bottom.
+  const heroWidth = Math.min(
+    width * (Platform.OS === 'android' ? 0.94 : 0.88),
+    Platform.OS === 'android' ? 420 : 380
+  );
+  const heroHeight =
+    Platform.OS === 'android'
+      ? Math.min(heroWidth * 1.5, height * 0.56, 500)
+      : Math.min(heroWidth * 1.12, height * 0.42, 340);
 
   const topInset =
     Platform.OS === 'android' ? insets.top + STATUS_BAR_HEIGHT : insets.top;
