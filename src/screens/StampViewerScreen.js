@@ -367,6 +367,7 @@ const StampViewerScreen = ({ navigation, route }) => {
           <View
             ref={shareStageRef}
             collapsable={false}
+            {...(Platform.OS === 'ios' ? { needsOffscreenAlphaCompositing: true } : null)}
             style={[styles.shareStage, styles.shareStageSized]}
           >
             <StampRenderer

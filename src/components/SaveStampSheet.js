@@ -31,6 +31,7 @@ import {
   Animated,
   Easing,
   Linking,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -171,6 +172,7 @@ function SaveStampSheet({ visible, stamp, onClose }) {
           <View
             ref={pngStageRef}
             collapsable={false}
+            {...(Platform.OS === 'ios' ? { needsOffscreenAlphaCompositing: true } : null)}
             style={[styles.stage, styles.stageSized, styles.framedStage]}
           >
             <StampRenderer

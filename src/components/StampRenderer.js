@@ -161,7 +161,7 @@ function SvgStamp({ layout, uri, clipId, onImageReady }) {
  * intentional here; unlike the normal stamp, this variant must never crop
  * the source photo.
  */
-function SvgFramedStamp({ layout, uri, onImageReady }) {
+function SvgFramedStamp({ layout, uri, clipId, onImageReady }) {
   const { outerWidth, outerHeight, scale, path } = layout;
   // A slightly wider white mat around the complete photo than the standard
   // stamp renderer uses. This is intentionally limited to the framed PNG.
@@ -170,28 +170,31 @@ function SvgFramedStamp({ layout, uri, onImageReady }) {
   const innerHeight = outerHeight - border * 2;
 
   return (
-    <View style={styles.frame}>
+    <View style={styles.framedExport}>
       <Svg width={outerWidth} height={outerHeight}>
-        {/* The area outside this path remains transparent in the PNG. */}
-        <Path d={path.d} fill="#FFFFFF" />
+        <Defs>
+          <ClipPath id={clipId}>
+            <Path d={path.d} />
+          </ClipPath>
+        </Defs>
 
         {/*
-         * Keep the photo rectangular and complete. `meet` scales the whole
-         * camera image into the frame without cropping it; the white stamp
-         * silhouette remains visible around it as a border.
+         * Clip the white mat + photo to the stamp silhouette so perforations
+         * stay transparent in the exported PNG (critical for iOS ViewShot).
          */}
-        <G
-          transform={`translate(${border} ${border})`}
-        >
-          <SvgImage
-            href={{ uri }}
-            x={0}
-            y={0}
-            width={innerWidth}
-            height={innerHeight}
-            preserveAspectRatio="xMidYMid meet"
-            onLoad={onImageReady}
-          />
+        <G clipPath={`url(#${clipId})`}>
+          <Path d={path.d} fill="#FFFFFF" />
+          <G transform={`translate(${border} ${border})`}>
+            <SvgImage
+              href={{ uri }}
+              x={0}
+              y={0}
+              width={innerWidth}
+              height={innerHeight}
+              preserveAspectRatio="xMidYMid meet"
+              onLoad={onImageReady}
+            />
+          </G>
         </G>
       </Svg>
     </View>
@@ -261,7 +264,12 @@ function StampRenderer({
   return (
     <View style={containerStyle} pointerEvents="none">
       {framed ? (
-        <SvgFramedStamp layout={layout} uri={uri} onImageReady={notifyImageReady} />
+        <SvgFramedStamp
+          layout={layout}
+          uri={uri}
+          clipId={clipId}
+          onImageReady={notifyImageReady}
+        />
       ) : forceSvg || !IS_SKIA_ENABLED ? (
         <SvgStamp
           layout={layout}
@@ -287,6 +295,9 @@ const styles = StyleSheet.create({
   svgShadow: {
     shadowColor: STAMP_COLORS.shadow,
     elevation: 12,
+    backgroundColor: 'transparent',
+  },
+  framedExport: {
     backgroundColor: 'transparent',
   },
 });

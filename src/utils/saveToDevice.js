@@ -88,10 +88,6 @@ export function hasCachedFramedShare(cacheKey) {
   return !!cacheKey && framedShareCache.has(cacheKey);
 }
 
-/** iOS drawViewHierarchyInRect often misses SVG/async images; renderInContext is safer. */
-const IOS_CAPTURE_OPTS =
-  Platform.OS === 'ios' ? { useRenderInContext: true } : {};
-
 /**
  * Gate that resolves once StampRenderer reports its photo bitmap is ready.
  * ViewShot does not wait for SvgImage/Skia decode — without this, iOS captures
@@ -125,7 +121,7 @@ export function createImageReadyGate() {
   };
 }
 
-async function waitForCapturePaint(uri, readyGate) {
+async function waitForCapturePaint(uri, readyGate, { framed = false } = {}) {
   if (uri) {
     try {
       await Image.prefetch(uri);
@@ -142,19 +138,28 @@ async function waitForCapturePaint(uri, readyGate) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   if (Platform.OS === 'ios') {
-    await new Promise((r) => setTimeout(r, 150));
+    // Framed SVG paths need a little longer when not using renderInContext.
+    await new Promise((r) => setTimeout(r, framed ? 280 : 150));
   }
 }
 
-async function captureView(viewRef, uri, readyGate) {
-  await waitForCapturePaint(uri, readyGate);
+async function captureView(viewRef, uri, readyGate, { framed = false } = {}) {
+  await waitForCapturePaint(uri, readyGate, { framed });
 
-  return ViewShot.captureRef(viewRef, {
+  const opts = {
     format: 'png',
     quality: 1,
     result: 'tmpfile',
-    ...IOS_CAPTURE_OPTS,
-  });
+  };
+
+  if (Platform.OS === 'ios') {
+    // Scalloped stamp (transparent PNG): renderInContext loads SvgImage reliably.
+    // Framed stamp (white mat + perforations): renderInContext flattens the SVG
+    // path into a plain white rectangle and drops the scalloped border.
+    opts.useRenderInContext = !framed;
+  }
+
+  return ViewShot.captureRef(viewRef, opts);
 }
 
 /**
@@ -266,7 +271,7 @@ export async function saveFramedStampView(viewRef, uri, readyGate) {
   if (!perm.ok) return perm;
 
   try {
-    const shot = await captureView(viewRef, uri, readyGate);
+    const shot = await captureView(viewRef, uri, readyGate, { framed: true });
 
     await fileToGallery(shot);
     return { ok: true, uri: shot };
@@ -306,7 +311,7 @@ export async function shareFramedStampView(viewRef, cacheKey, uri, readyGate) {
       if (!viewRef?.current) {
         return { ok: false, error: 'Nothing to share yet. Try again in a moment.' };
       }
-      shot = await captureView(viewRef, uri, readyGate);
+      shot = await captureView(viewRef, uri, readyGate, { framed: true });
       if (cacheKey) framedShareCache.set(cacheKey, shot);
     }
 
