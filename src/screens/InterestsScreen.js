@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, StatusBar} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Button } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const InterestItem = ({ label, icon, selected, onPress }) => (
-  <TouchableOpacity 
-    style={[styles.item, selected && styles.selectedItem]} 
+  <TouchableOpacity
+    style={[styles.item, selected && styles.selectedItem]}
     onPress={onPress}
   >
     <Text style={styles.iconText}>{icon}</Text>
@@ -30,67 +31,44 @@ const InterestsScreen = ({ navigation }) => {
 
   const toggleInterest = (id) => {
     if (selected.includes(id)) {
-      setSelected(selected.filter(i => i !== id));
+      setSelected(selected.filter((i) => i !== id));
     } else {
       setSelected([...selected, id]);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '80%' }]} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>What moments do you love capturing?</Text>
-        <Text style={styles.subtitle}>Pick as many as you like</Text>
-
-        <View style={styles.grid}>
-          {interests.map((int) => (
-            <InterestItem 
-              key={int.id}
-              label={int.label}
-              icon={int.icon}
-              selected={selected.includes(int.id)}
-              onPress={() => toggleInterest(int.id)}
-            />
-          ))}
-        </View>
-
-        <Button 
-          title="Continue" 
+    <OnboardingStepLayout
+      progressWidth="80%"
+      footer={
+        <Button
+          title="Continue"
           variant="secondary"
           style={selected.length > 0 ? styles.activeButton : styles.disabledButton}
           textStyle={selected.length > 0 ? styles.activeButtonText : null}
-          onPress={() => selected.length > 0 && navigation.navigate('Privacy')} 
+          onPress={() => selected.length > 0 && navigation.navigate('Privacy')}
         />
-      </ScrollView>
-    </SafeAreaView>
+      }
+    >
+      <Text style={styles.title}>What moments do you love capturing?</Text>
+      <Text style={styles.subtitle}>Pick as many as you like</Text>
+
+      <View style={styles.grid}>
+        {interests.map((int) => (
+          <InterestItem
+            key={int.id}
+            label={int.label}
+            icon={int.icon}
+            selected={selected.includes(int.id)}
+            onPress={() => toggleInterest(int.id)}
+          />
+        ))}
+      </View>
+    </OnboardingStepLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  scrollContent: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
   title: {
     fontSize: 32,
     includeFontPadding: false,
@@ -115,7 +93,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: SPACING.xl,
   },
   item: {
     width: '48%',
@@ -131,7 +108,6 @@ const styles = StyleSheet.create({
   },
   selectedItem: {
     borderColor: COLORS.primary,
-    // Solid purple so the white selected label stays readable.
     backgroundColor: COLORS.primary,
   },
   selectedLabel: {

@@ -18,7 +18,8 @@
         "NSPhotoLibraryUsageDescription": "TheStampO needs your photos so you can turn one into a stamp.",
         "NSPhotoLibraryAddUsageDescription": "TheStampO saves your stamps to your gallery.",
         "NSLocationWhenInUseUsageDescription": "TheStampO tags a stamp with where you were, only when you tap the location button.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -102,6 +103,14 @@
           "photosPermission": "TheStampO saves your stamps to your gallery.",
           "savePhotosPermission": "TheStampO saves your stamps to your gallery.",
           "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#5B2B8A",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": true
         }
       ]
     ],

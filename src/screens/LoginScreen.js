@@ -12,7 +12,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TextInput,
   TouchableOpacity,
   StatusBar,
@@ -20,9 +19,12 @@ import {
   Easing,
   BackHandler,
   Keyboard,
+  ScrollView,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDialog } from '../components/AppDialog';
 
 import StampHero from '../components/StampHero';
@@ -30,7 +32,6 @@ import { useAuth } from '../data/authStore';
 import { setOnboarded } from '../data/appState';
 import {
   STATUS_BAR_HEIGHT,
-  useBottomInset,
   shadow,
   weight,
   HAIRLINE,
@@ -83,7 +84,10 @@ const Field = React.forwardRef(function Field(
 const LoginScreen = ({ navigation }) => {
   const { showDialog } = useAppDialog();
   const { height: winH } = useWindowDimensions();
-  const bottomInset = useBottomInset();
+  const insets = useSafeAreaInsets();
+  const topInset =
+    Platform.OS === 'android' ? insets.top + STATUS_BAR_HEIGHT : insets.top;
+  const bottomInset = Math.max(insets.bottom, 12);
   const { signIn, google, resetPassword, googleAvailable, busy } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -114,7 +118,6 @@ const LoginScreen = ({ navigation }) => {
   }, [enter]);
 
   const L = useMemo(() => {
-    const usable = winH - STATUS_BAR_HEIGHT - bottomInset;
     const comfy = {
       pad: 14, back: 34, title: 34, subtitle: 40, field: 54, fieldGap: 11,
       forgot: 30, cta: 56, orRow: 40, social: 52, login: 26,
@@ -123,20 +126,30 @@ const LoginScreen = ({ navigation }) => {
       pad: 8, back: 30, title: 30, subtitle: 22, field: 48, fieldGap: 8,
       forgot: 26, cta: 50, orRow: 30, social: 46, login: 22,
     };
-    const measure = (m) =>
-      m.pad * 2 + m.back + m.title + m.subtitle + m.field * 2 + m.fieldGap +
-      m.forgot + 12 + m.cta + m.orRow + m.social + 10 + m.login;
+
+    const measureScroll = (m) =>
+      m.back + m.title + m.subtitle + m.field * 2 + m.fieldGap +
+      m.forgot + 12 + m.cta;
+
+    const measureFooter = (m) => m.orRow + m.social + 10 + m.login + m.pad;
 
     let m = comfy;
-    let used = measure(m);
-    if (used > usable) {
+    let footerUsed = measureFooter(m);
+    let scrollUsed = measureScroll(m);
+    let usableScroll =
+      winH - topInset - bottomInset - footerUsed - m.pad;
+
+    if (scrollUsed > usableScroll) {
       m = tight;
-      used = measure(m);
+      footerUsed = measureFooter(m);
+      scrollUsed = measureScroll(m);
+      usableScroll = winH - topInset - bottomInset - footerUsed - m.pad;
     }
-    const leftover = usable - used;
+
+    const leftover = usableScroll - scrollUsed;
     const heroH = leftover >= HERO_MIN ? clamp(leftover, HERO_MIN, HERO_MAX) : 0;
     return { ...m, heroH };
-  }, [winH, bottomInset]);
+  }, [winH, topInset, bottomInset]);
 
   const showHero = L.heroH > 0 && !keyboardUp;
 
@@ -211,17 +224,27 @@ const LoginScreen = ({ navigation }) => {
   const firstError = errors.form || errors.email || errors.password;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: topInset, paddingBottom: bottomInset },
+      ]}
+    >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={{ height: STATUS_BAR_HEIGHT }} />
 
       <Animated.View
         style={[
           styles.page,
-          { paddingVertical: L.pad, paddingBottom: L.pad + bottomInset },
+          { paddingTop: L.pad },
           enterStyle,
         ]}
       >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <TouchableOpacity
           style={[styles.back, { height: L.back }]}
           onPress={() => navigation.goBack()}
@@ -307,60 +330,64 @@ const LoginScreen = ({ navigation }) => {
         >
           <Text style={styles.ctaText}>{busy ? 'Logging in…' : 'Log In'}</Text>
         </TouchableOpacity>
+        </ScrollView>
 
-        <View style={[styles.orRow, { height: L.orRow }]}>
-          <View style={styles.rule} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.rule} />
-        </View>
+        <View style={[styles.footer, { paddingBottom: L.pad }]}>
+          <View style={[styles.orRow, { height: L.orRow }]}>
+            <View style={styles.rule} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.rule} />
+          </View>
 
-        <View style={styles.socialRow}>
-          <TouchableOpacity
-            style={[styles.socialBtn, { height: L.social }]}
-            activeOpacity={ACTIVE_OPACITY}
-            onPress={handleGoogle}
-            disabled={busy}
-          >
-            <Text style={styles.googleG}>G</Text>
-            <Text style={styles.socialText}>Google</Text>
-          </TouchableOpacity>
-
-          {/*
-            Phone OTP is intentionally not part of this release. Keep this
-            entry point beside the retained PhoneAuth screen so it can be
-            restored later without rebuilding the authentication flow.
-
-            <View style={{ width: 12 }} />
+          <View style={styles.socialRow}>
             <TouchableOpacity
               style={[styles.socialBtn, { height: L.social }]}
               activeOpacity={ACTIVE_OPACITY}
-              onPress={() => navigation.navigate('PhoneAuth')}
+              onPress={handleGoogle}
+              disabled={busy}
             >
-              <Feather name="smartphone" size={18} color={INK} />
-              <Text style={styles.socialText}>Phone</Text>
+              <Text style={styles.googleG}>G</Text>
+              <Text style={styles.socialText}>Google</Text>
             </TouchableOpacity>
-          */}
-        </View>
 
-        <View style={styles.spacer} />
+            {/*
+              Phone OTP is intentionally not part of this release. Keep this
+              entry point beside the retained PhoneAuth screen so it can be
+              restored later without rebuilding the authentication flow.
 
-        <View style={[styles.loginRow, { height: L.login }]}>
-          <Text style={styles.loginMuted}>New here? </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Signup')}
-            activeOpacity={ACTIVE_OPACITY}
-          >
-            <Text style={styles.loginLink}>Create an account</Text>
-          </TouchableOpacity>
+              <View style={{ width: 12 }} />
+              <TouchableOpacity
+                style={[styles.socialBtn, { height: L.social }]}
+                activeOpacity={ACTIVE_OPACITY}
+                onPress={() => navigation.navigate('PhoneAuth')}
+              >
+                <Feather name="smartphone" size={18} color={INK} />
+                <Text style={styles.socialText}>Phone</Text>
+              </TouchableOpacity>
+            */}
+          </View>
+
+          <View style={[styles.loginRow, { height: L.login }]}>
+            <Text style={styles.loginMuted}>New here? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Signup')}
+              activeOpacity={ACTIVE_OPACITY}
+            >
+              <Text style={styles.loginLink}>Create an account</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 8 },
   page: { flex: 1, paddingHorizontal: `${((1 - CONTENT_RATIO) / 2) * 100}%` },
+  footer: { width: '100%' },
   back: { alignSelf: 'flex-start', justifyContent: 'center', paddingRight: 12 },
   heroWrap: { alignItems: 'center', justifyContent: 'center' },
   title: {
@@ -456,7 +483,6 @@ const styles = StyleSheet.create({
     color: '#4285F4',
     ...weight(700),
   },
-  spacer: { flex: 1, minHeight: 8 },
   loginRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   loginMuted: { fontSize: 14, includeFontPadding: false, color: '#6F6478' },
   loginLink: { fontSize: 14, includeFontPadding: false, color: ACCENT, ...weight(700) },

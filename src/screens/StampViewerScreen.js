@@ -36,9 +36,13 @@ import {
   Easing,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
+  Platform,
+  ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import StampRenderer from '../components/StampRenderer';
 import SaveStampSheet from '../components/SaveStampSheet';
@@ -47,8 +51,10 @@ import { useStamps, updateStamp } from '../data/stampStore';
 import { formatLocation } from '../utils/location';
 import {
   CAPTURE_WIDTH,
+  CAPTURE_HEIGHT,
   hasCachedFramedShare,
   shareFramedStampView,
+  createImageReadyGate,
 } from '../utils/saveToDevice';
 import { STAMP_COLORS } from '../styles/stampTheme';
 import {
@@ -79,6 +85,7 @@ const formatDate = (ts) => {
 const StampViewerScreen = ({ navigation, route }) => {
   const { showDialog } = useAppDialog();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { stamps } = useStamps();
   const bottomInset = useBottomInset();
 
@@ -100,13 +107,44 @@ const StampViewerScreen = ({ navigation, route }) => {
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const listRef = useRef(null);
   const shareStageRef = useRef(null);
   const shareInFlight = useRef(false);
+  const shareReadyGate = useRef(createImageReadyGate());
   const sheet = useRef(new Animated.Value(0)).current;
 
   const current = stamps[index] || null;
+
+  useEffect(() => {
+    shareReadyGate.current.reset();
+  }, [current?.id, current?.uri]);
+
+  useEffect(() => {
+    if (!editing) {
+      setKeyboardInset(0);
+      return;
+    }
+
+    const updateInset = (e) => {
+      setKeyboardInset(e.endCoordinates?.height ?? 0);
+    };
+    const clearInset = () => setKeyboardInset(0);
+
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, updateInset);
+    const hideSub = Keyboard.addListener(hideEvent, clearInset);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [editing]);
 
   useEffect(() => {
     Animated.timing(sheet, {
@@ -133,15 +171,28 @@ const StampViewerScreen = ({ navigation, route }) => {
   }, [current]);
 
   const saveNote = useCallback(async () => {
-    if (!current) return;
+    if (!current || savingNote) return;
     const value = draft.trim();
-    setEditing(false);
+    setSavingNote(true);
     try {
-      await updateStamp(current.id, { note: value });
+      const updated = await updateStamp(current.id, { note: value });
+      if (!updated) {
+        showDialog({
+          title: 'Could not save note',
+          message: 'This stamp may have been removed. Try again.',
+        });
+        return;
+      }
+      setEditing(false);
     } catch (e) {
-      /* the store keeps the old value; nothing to roll back */
+      showDialog({
+        title: 'Could not save note',
+        message: 'Something went wrong while saving. Please try again.',
+      });
+    } finally {
+      setSavingNote(false);
     }
-  }, [current, draft]);
+  }, [current, draft, savingNote, showDialog]);
 
   const handleShare = useCallback(async () => {
     if (!current || shareInFlight.current) return;
@@ -151,11 +202,12 @@ const StampViewerScreen = ({ navigation, route }) => {
     if (needsCapture) setSharing(true);
 
     try {
-      // The stage must mount and lay out before ViewShot captures it.
-      if (needsCapture) {
-        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-      }
-      const result = await shareFramedStampView(shareStageRef, shareCacheKey);
+      const result = await shareFramedStampView(
+        shareStageRef,
+        shareCacheKey,
+        current.uri,
+        needsCapture ? shareReadyGate.current : null
+      );
 
       if (!result.ok) {
         showDialog({ title: 'Could not share', message: result.error });
@@ -337,15 +389,21 @@ const StampViewerScreen = ({ navigation, route }) => {
         onClose={() => setSaving(false)}
       />
 
-      {/* Full-resolution, off-screen stage for the shared framed PNG. */}
-      {sharing ? (
+      {/* Full-resolution, off-screen stage for share/save framed PNG captures. */}
+      {current ? (
         <View style={styles.shareStageWrap} pointerEvents="none">
-          <View ref={shareStageRef} collapsable={false} style={styles.shareStage}>
+          <View
+            ref={shareStageRef}
+            collapsable={false}
+            style={[styles.shareStage, styles.shareStageSized]}
+          >
             <StampRenderer
-              uri={current?.uri}
+              uri={current.uri}
               width={CAPTURE_WIDTH}
               rotation={0}
               framed
+              forceSvg
+              onImageReady={() => shareReadyGate.current.notify()}
             />
           </View>
         </View>
@@ -360,7 +418,11 @@ const StampViewerScreen = ({ navigation, route }) => {
         navigationBarTranslucent
         onRequestClose={() => setEditing(false)}
       >
-        <KeyboardAvoidingView style={styles.modalWrap} behavior="height">
+        <KeyboardAvoidingView
+          style={styles.modalWrap}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        >
           <TouchableOpacity
             style={styles.scrim}
             activeOpacity={1}
@@ -369,7 +431,9 @@ const StampViewerScreen = ({ navigation, route }) => {
           <Animated.View
             style={[
               styles.sheet,
-              { paddingBottom: 18 + bottomInset },
+              {
+                paddingBottom: 18 + bottomInset + keyboardInset,
+              },
               {
                 opacity: sheet,
                 transform: [
@@ -386,38 +450,50 @@ const StampViewerScreen = ({ navigation, route }) => {
             <View style={styles.grabber} />
             <Text style={styles.sheetTitle}>Note</Text>
 
-            <TextInput
-              style={styles.sheetInput}
-              value={draft}
-              onChangeText={(v) => setDraft(v.slice(0, NOTE_MAX))}
-              placeholder="What made this moment worth keeping?"
-              placeholderTextColor={STAMP_COLORS.textMuted}
-              multiline
-              autoFocus
-              maxLength={NOTE_MAX}
-              textAlignVertical="top"
-            />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+            >
+              <TextInput
+                style={[
+                  styles.sheetInput,
+                  keyboardInset > 0 && styles.sheetInputCompact,
+                ]}
+                value={draft}
+                onChangeText={(v) => setDraft(v.slice(0, NOTE_MAX))}
+                placeholder="What made this moment worth keeping?"
+                placeholderTextColor={STAMP_COLORS.textMuted}
+                multiline
+                autoFocus
+                maxLength={NOTE_MAX}
+                textAlignVertical="top"
+              />
 
-            <Text style={styles.sheetCounter}>
-              {draft.length}/{NOTE_MAX}
-            </Text>
+              <Text style={styles.sheetCounter}>
+                {draft.length}/{NOTE_MAX}
+              </Text>
 
-            <View style={styles.sheetActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setEditing(false)}
-                activeOpacity={ACTIVE_OPACITY}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={saveNote}
-                activeOpacity={ACTIVE_OPACITY}
-              >
-                <Text style={styles.saveText}>Save note</Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.sheetActions}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setEditing(false)}
+                  activeOpacity={ACTIVE_OPACITY}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={saveNote}
+                  activeOpacity={ACTIVE_OPACITY}
+                  disabled={savingNote}
+                >
+                  <Text style={styles.saveText}>
+                    {savingNote ? 'Saving…' : 'Save note'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
@@ -449,11 +525,14 @@ const styles = StyleSheet.create({
   iconBtnSpaced: { marginLeft: 8 },
   shareStageWrap: {
     position: 'absolute',
-    left: -9999,
+    left: -10000,
     top: 0,
-    opacity: 0.01,
   },
-  shareStage: { backgroundColor: 'transparent' },
+  shareStage: { backgroundColor: '#FFFFFF' },
+  shareStageSized: {
+    width: CAPTURE_WIDTH,
+    height: CAPTURE_HEIGHT,
+  },
   counter: {
     fontSize: 14,
     includeFontPadding: false,
@@ -573,6 +652,7 @@ const styles = StyleSheet.create({
   },
   sheetInput: {
     minHeight: 92,
+    maxHeight: 160,
     borderWidth: HAIRLINE,
     borderColor: '#E5DDEC',
     borderRadius: 12,
@@ -584,6 +664,10 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     includeFontPadding: false,
     color: STAMP_COLORS.textPrimary,
+  },
+  sheetInputCompact: {
+    minHeight: 72,
+    maxHeight: 120,
   },
   sheetCounter: {
     alignSelf: 'flex-end',

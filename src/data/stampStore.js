@@ -155,9 +155,13 @@ async function writeIndex(list) {
   }
 }
 
-/** Newest first. */
+/** Newest first; break ties by id so order stays stable. */
 const sortStamps = (list) =>
-  [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  [...list].sort((a, b) => {
+    const diff = (b.createdAt || 0) - (a.createdAt || 0);
+    if (diff !== 0) return diff;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
 
 /** Load all stamps for the current owner (cached after the first call). */
 export async function loadStamps() {

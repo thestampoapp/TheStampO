@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, StatusBar} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Button, OptionItem } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const ExcitementScreen = ({ navigation }) => {
   const [selected, setSelected] = useState(null);
@@ -16,61 +17,38 @@ const ExcitementScreen = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '30%' }]} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>What excites you most about StampO?</Text>
-        <Text style={styles.subtitle}>Pick the one that fits you best</Text>
-
-        <View style={styles.optionsContainer}>
-          {options.map((opt) => (
-            <OptionItem 
-              key={opt.id}
-              label={opt.label}
-              icon={<Text style={styles.iconText}>{opt.icon}</Text>}
-              selected={selected === opt.id}
-              onPress={() => setSelected(opt.id)}
-              alignLeft={true}
-            />
-          ))}
-        </View>
-
-        <Button 
-          title="Continue" 
+    <OnboardingStepLayout
+      progressWidth="30%"
+      footer={
+        <Button
+          title="Continue"
           variant="secondary"
           style={selected ? styles.activeButton : styles.disabledButton}
           textStyle={selected ? styles.activeButtonText : null}
-          onPress={() => selected && navigation.navigate('Frustration')} 
+          onPress={() => selected && navigation.navigate('Frustration')}
         />
-      </ScrollView>
-    </SafeAreaView>
+      }
+    >
+      <Text style={styles.title}>What excites you most about StampO?</Text>
+      <Text style={styles.subtitle}>Pick the one that fits you best</Text>
+
+      <View style={styles.optionsContainer}>
+        {options.map((opt) => (
+          <OptionItem
+            key={opt.id}
+            label={opt.label}
+            icon={<Text style={styles.iconText}>{opt.icon}</Text>}
+            selected={selected === opt.id}
+            onPress={() => setSelected(opt.id)}
+            alignLeft={true}
+          />
+        ))}
+      </View>
+    </OnboardingStepLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  scrollContent: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
   title: {
     fontSize: 32,
     includeFontPadding: false,
@@ -92,7 +70,6 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     width: '100%',
-    marginBottom: SPACING.xl,
   },
   iconText: {
     fontSize: 20,

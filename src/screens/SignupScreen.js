@@ -3,18 +3,12 @@
  *
  * Shown after the trial experience ends (Rating -> "Maybe later").
  *
- * SINGLE SCREEN, NO SCROLLING.
- * ---------------------------
- * The naive layout needed ~1108dp of vertical space; a 640dp phone only
- * offers ~616dp once the status bar is gone. Three things make it fit:
- *
- *   1. labels are folded INTO the fields as placeholders  (-92dp)
- *   2. the two social buttons sit side by side as icons   (-72dp)
- *   3. the hero is elastic: it takes whatever height is left over, and
- *      disappears entirely below a threshold instead of pushing the form off
- *
- * Sizes are therefore computed from the measured window rather than being
- * constants, so the form always lands on one screen.
+ * SINGLE SCREEN LAYOUT.
+ * -----------------------
+ * The form scrolls if needed, but the Google sign-in row and login link are
+ * pinned in a footer so they stay visible without scrolling. Sizes are
+ * computed from the measured window so the hero only appears when there is
+ * enough room left in the scroll area.
  *
  * Signing up is SKIPPABLE -- everything before this is an anonymous local
  * trial and those stamps are already saved.
@@ -29,7 +23,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TextInput,
   TouchableOpacity,
   StatusBar,
@@ -39,16 +32,17 @@ import {
   Linking,
   Keyboard,
   ScrollView,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import StampHero from '../components/StampHero';
 import { useAuth } from '../data/authStore';
 import { setOnboarded } from '../data/appState';
 import {
   STATUS_BAR_HEIGHT,
-  useBottomInset,
   shadow,
   weight,
   HAIRLINE,
@@ -114,7 +108,10 @@ const Field = React.forwardRef(function Field(
 
 const SignupScreen = ({ navigation }) => {
   const { height: winH } = useWindowDimensions();
-  const bottomInset = useBottomInset();
+  const insets = useSafeAreaInsets();
+  const topInset =
+    Platform.OS === 'android' ? insets.top + STATUS_BAR_HEIGHT : insets.top;
+  const bottomInset = Math.max(insets.bottom, 12);
   const { signUp, google, busy, isMock, mockReason } = useAuth();
 
   const [name, setName] = useState('');
@@ -158,9 +155,6 @@ const SignupScreen = ({ navigation }) => {
 
   // -- adaptive vertical layout -------------------------------------------
   const L = useMemo(() => {
-    const usable = winH - STATUS_BAR_HEIGHT - bottomInset;
-
-    // Everything that is not the hero, at comfortable sizes.
     const comfortable = {
       pad: 12,
       back: 30,
@@ -175,7 +169,6 @@ const SignupScreen = ({ navigation }) => {
       login: 26,
     };
 
-    // Tight variant for short screens.
     const tight = {
       pad: 8,
       back: 30,
@@ -190,42 +183,37 @@ const SignupScreen = ({ navigation }) => {
       login: 22,
     };
 
-    const measure = (m) =>
-      m.pad * 2 +
+    const measureScroll = (m) =>
       m.back +
       m.title +
       m.subtitle +
       m.field * 4 +
       m.fieldGap * 3 +
-      18 + m.terms + // error slot renders with minHeight 18
+      18 + m.terms +
       12 + m.cta +
-      m.orRow +
-      m.social +
-      10 + m.login +
-      // The mock banner is real content too: when Firebase is missing it
-      // takes ~92dp, and ignoring it clipped everything below it.
       (isMock ? BANNER_H : 0);
 
+    const measureFooter = (m) => m.orRow + m.social + 10 + m.login + m.pad;
+
     let m = comfortable;
-    let used = measure(m);
-    if (used > usable) {
+    let footerUsed = measureFooter(m);
+    let scrollUsed = measureScroll(m);
+    let usableScroll =
+      winH - topInset - bottomInset - footerUsed - m.pad;
+
+    if (scrollUsed > usableScroll) {
       m = tight;
-      used = measure(m);
+      footerUsed = measureFooter(m);
+      scrollUsed = measureScroll(m);
+      usableScroll = winH - topInset - bottomInset - footerUsed - m.pad;
     }
 
-    const leftover = usable - used;
-    // The hero absorbs slack. If there is some slack but not a full hero's
-    // worth, still render the minimum hero and let the ScrollView carry the
-    // small overflow -- losing the illustration entirely reads as a bug.
+    const leftover = usableScroll - scrollUsed;
     const heroH =
-      leftover >= HERO_MIN
-        ? clamp(leftover, HERO_MIN, HERO_MAX)
-        : leftover >= 0
-          ? HERO_MIN
-          : 0;
+      leftover >= HERO_MIN ? clamp(leftover, HERO_MIN, HERO_MAX) : 0;
 
-    return { ...m, heroH, fits: used <= usable };
-  }, [winH, bottomInset, isMock]);
+    return { ...m, heroH, fits: scrollUsed <= usableScroll };
+  }, [winH, topInset, bottomInset, isMock]);
 
   const showHero = L.heroH > 0 && !keyboardUp;
 
@@ -324,20 +312,21 @@ const SignupScreen = ({ navigation }) => {
     errors.agreed;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: topInset, paddingBottom: bottomInset },
+      ]}
+    >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={{ height: STATUS_BAR_HEIGHT }} />
 
       <Animated.View
         style={[
           styles.page,
-          { paddingVertical: L.pad, paddingBottom: L.pad + bottomInset },
+          { paddingTop: L.pad },
           enterStyle,
         ]}
       >
-        {/* Safety valve: normally everything fits on one screen, but if the
-            budget is ever exceeded (huge fonts, extra banners) the content
-            scrolls instead of being clipped off the bottom. */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -493,57 +482,56 @@ const SignupScreen = ({ navigation }) => {
             {submitting || busy ? 'Creating…' : 'Create Account'}
           </Text>
         </TouchableOpacity>
+        </ScrollView>
 
-        <View style={[styles.orRow, { height: L.orRow }]}>
-          <View style={styles.rule} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.rule} />
-        </View>
+        <View style={[styles.footer, { paddingBottom: L.pad }]}>
+          <View style={[styles.orRow, { height: L.orRow }]}>
+            <View style={styles.rule} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.rule} />
+          </View>
 
-        {/* Google is the only social sign-in option in this release. */}
-        <View style={styles.socialRow}>
-          <TouchableOpacity
-            style={[styles.socialBtn, { height: L.social }]}
-            activeOpacity={ACTIVE_OPACITY}
-            onPress={handleGoogle}
-            disabled={busy}
-          >
-            <Text style={styles.googleG}>G</Text>
-            <Text style={styles.socialText}>Google</Text>
-          </TouchableOpacity>
-
-          {/*
-            Phone OTP is intentionally not part of this release. Keep this
-            entry point beside the retained PhoneAuth screen so it can be
-            restored later without rebuilding the authentication flow.
-
-            <View style={{ width: 12 }} />
+          {/* Google is the only social sign-in option in this release. */}
+          <View style={styles.socialRow}>
             <TouchableOpacity
               style={[styles.socialBtn, { height: L.social }]}
               activeOpacity={ACTIVE_OPACITY}
-              onPress={() => navigation.navigate('PhoneAuth')}
+              onPress={handleGoogle}
+              disabled={busy}
             >
-              <Feather name="smartphone" size={18} color={INK} />
-              <Text style={styles.socialText}>Phone</Text>
+              <Text style={styles.googleG}>G</Text>
+              <Text style={styles.socialText}>Google</Text>
             </TouchableOpacity>
-          */}
-        </View>
 
-        {/* Pushes the login row to the bottom when there is spare room */}
-        <View style={styles.spacer} />
+            {/*
+              Phone OTP is intentionally not part of this release. Keep this
+              entry point beside the retained PhoneAuth screen so it can be
+              restored later without rebuilding the authentication flow.
 
-        <View style={[styles.loginRow, { height: L.login }]}>
-          <Text style={styles.loginMuted}>Already have an account? </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
-            activeOpacity={ACTIVE_OPACITY}
-          >
-            <Text style={styles.loginLink}>Log in</Text>
-          </TouchableOpacity>
+              <View style={{ width: 12 }} />
+              <TouchableOpacity
+                style={[styles.socialBtn, { height: L.social }]}
+                activeOpacity={ACTIVE_OPACITY}
+                onPress={() => navigation.navigate('PhoneAuth')}
+              >
+                <Feather name="smartphone" size={18} color={INK} />
+                <Text style={styles.socialText}>Phone</Text>
+              </TouchableOpacity>
+            */}
+          </View>
+
+          <View style={[styles.loginRow, { height: L.login }]}>
+            <Text style={styles.loginMuted}>Already have an account? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={ACTIVE_OPACITY}
+            >
+              <Text style={styles.loginLink}>Log in</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        </ScrollView>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -573,11 +561,14 @@ const styles = StyleSheet.create({
 
   container: { flex: 1, backgroundColor: BG },
   scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
+  scrollContent: { paddingBottom: 8 },
 
   page: {
     flex: 1,
     paddingHorizontal: `${((1 - CONTENT_RATIO) / 2) * 100}%`,
+  },
+  footer: {
+    width: '100%',
   },
 
   back: { alignSelf: 'flex-start', justifyContent: 'center', paddingRight: 12 },
@@ -703,8 +694,6 @@ const styles = StyleSheet.create({
     color: '#4285F4',
     ...weight(700),
   },
-
-  spacer: { flex: 1, minHeight: 8 },
 
   loginRow: {
     flexDirection: 'row',

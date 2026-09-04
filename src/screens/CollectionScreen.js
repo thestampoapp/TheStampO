@@ -42,10 +42,11 @@ import {
   Easing,
   BackHandler,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import StampRenderer from '../components/StampRenderer';
+import StampRenderer, { STAMP } from '../components/StampRenderer';
 import TabBar from '../components/TabBar';
 import { useStamps, moveStamps } from '../data/stampStore';
 import CollectionPicker from '../components/CollectionPicker';
@@ -73,6 +74,7 @@ const ACCENT = '#5B2B8A';
 const SIDE_MARGIN_RATIO = 0.0703;
 const GUTTER_RATIO = 0.0516;
 const COLUMNS = 3;
+const STAMP_ASPECT = STAMP.OUTER_HEIGHT / STAMP.OUTER_WIDTH;
 
 /**
  * One stamp tile. Memoized: in a long collection this is the difference
@@ -159,8 +161,18 @@ const StampTile = React.memo(function StampTile({
         onLongPress={() => onLongPress(item)}
         delayLongPress={280}
       >
-        <View style={selected && styles.tileSelected}>
-          <StampRenderer uri={item.uri} width={width} rotation={0} />
+        <View
+          style={[
+            selected && styles.tileSelected,
+            { width, height: Math.round(width * STAMP_ASPECT), overflow: 'hidden' },
+          ]}
+        >
+          {/*
+            Skia draws a canvas larger than the tile (shadow padding), which
+            gets clipped inside FlatList on iOS and leaves blank/faint tiles.
+            SVG matches the tile size exactly.
+          */}
+          <StampRenderer uri={item.uri} width={width} rotation={0} forceSvg />
         </View>
 
         {selectMode ? (
@@ -476,7 +488,7 @@ const CollectionScreen = ({ navigation, route }) => {
           numColumns={COLUMNS}
           columnWrapperStyle={[
             styles.row,
-            { paddingHorizontal: metrics.side },
+            { paddingHorizontal: metrics.side, gap: metrics.gutter },
           ]}
           contentContainerStyle={[
             styles.grid,
@@ -484,8 +496,8 @@ const CollectionScreen = ({ navigation, route }) => {
           ]}
           showsVerticalScrollIndicator={false}
           overScrollMode="never"
-          // Android perf: keep the render window tight on long collections.
-          removeClippedSubviews
+          // Skia/SVG stamps mis-render when aggressively clipped on iOS.
+          removeClippedSubviews={Platform.OS === 'android'}
           initialNumToRender={12}
           maxToRenderPerBatch={9}
           windowSize={7}
@@ -569,7 +581,9 @@ const styles = StyleSheet.create({
   selectTextActive: { color: ACCENT, ...weight(600) },
 
   grid: { paddingTop: 2 },
-  row: { justifyContent: 'space-between' },
+  // Pack tiles left-to-right. `space-between` leaves a huge gap when a row
+  // isn't full (e.g. only 2 stamps in a 3-column grid).
+  row: { justifyContent: 'flex-start' },
 
   tileSelected: {
     opacity: 0.62,

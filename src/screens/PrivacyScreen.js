@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, StatusBar} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Button } from '../components/Common';
+import OnboardingStepLayout from '../components/OnboardingStepLayout';
 import { COLORS, SPACING } from '../styles/theme';
-import { STATUS_BAR_HEIGHT, weight } from '../styles/platform';
+import { weight } from '../styles/platform';
 
 const PrivacyItem = ({ icon, title, description }) => (
   <View style={styles.privacyItem}>
@@ -40,56 +41,30 @@ const PrivacyScreen = ({ navigation }) => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.androidStatusSpacer} />
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '90%' }]} />
+    <OnboardingStepLayout
+      progressWidth="90%"
+      footer={<Button title="Continue" onPress={() => navigation.navigate('CameraIntro')} />}
+    >
+      <View style={styles.header}>
+        <View style={styles.iconCircle}>
+          <Text style={styles.shieldIcon}>🛡️</Text>
+        </View>
+        <Text style={styles.title}>Your privacy comes first</Text>
+        <Text style={styles.subtitle}>
+          Everything you create in StampO stays 100% on your device. Here's our promise:
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.shieldIcon}>🛡️</Text>
-          </View>
-          <Text style={styles.title}>Your privacy comes first</Text>
-          <Text style={styles.subtitle}>Everything you create in StampO stays 100% on your device. Here's our promise:</Text>
-        </View>
-
-        <View style={styles.list}>
-          {promises.map((p, i) => (
-            <PrivacyItem key={i} {...p} />
-          ))}
-        </View>
-
-        <Button 
-          title="Continue" 
-          onPress={() => navigation.navigate('CameraIntro')} 
-        />
-      </ScrollView>
-    </SafeAreaView>
+      <View style={styles.list}>
+        {promises.map((p, i) => (
+          <PrivacyItem key={i} {...p} />
+        ))}
+      </View>
+    </OnboardingStepLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  androidStatusSpacer: { height: STATUS_BAR_HEIGHT },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: COLORS.greyLight,
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-  },
-  scrollContent: {
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
   header: {
     alignItems: 'center',
     marginBottom: SPACING.xl * 2,
@@ -125,7 +100,6 @@ const styles = StyleSheet.create({
   },
   list: {
     width: '100%',
-    marginBottom: SPACING.xl * 2,
   },
   privacyItem: {
     flexDirection: 'row',

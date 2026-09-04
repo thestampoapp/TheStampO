@@ -8,6 +8,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { AppDialogProvider } from './src/components/AppDialog';
 import { MONETIZATION_ENABLED } from './src/data/monetization';
+import {
+  configureNotificationHandler,
+  addNotificationListeners,
+  ensurePushRegistration,
+} from './src/notifications/pushNotifications';
+import { loadPushToken } from './src/data/notificationStore';
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import ReferralScreen from './src/screens/ReferralScreen';
@@ -66,6 +72,30 @@ export default function App() {
     import('./src/data/ads')
       .then((m) => m.initAds())
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    configureNotificationHandler();
+    loadPushToken().catch(() => {});
+
+    const removeListeners = addNotificationListeners({
+      onReceive: (notification) => {
+        if (__DEV__) {
+          console.log('[push] received foreground', notification?.request?.content);
+        }
+      },
+      onResponse: (response) => {
+        if (__DEV__) {
+          console.log('[push] user tapped', response?.notification?.request?.content);
+        }
+        // Future: deep-link from notification data, e.g. stampId or screen name.
+      },
+    });
+
+    // Silently refresh the token when permission was granted in a prior session.
+    ensurePushRegistration().catch(() => {});
+
+    return removeListeners;
   }, []);
 
   return (

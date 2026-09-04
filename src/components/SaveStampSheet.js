@@ -38,7 +38,9 @@ import {
   saveStampView,
   saveFramedStampView,
   CAPTURE_WIDTH,
+  CAPTURE_HEIGHT,
   isSaveAvailable,
+  createImageReadyGate,
 } from '../utils/saveToDevice';
 import { STAMP_COLORS } from '../styles/stampTheme';
 import {
@@ -79,51 +81,54 @@ function SaveStampSheet({ visible, stamp, onClose }) {
 
   const stageRef = useRef(null);
   const pngStageRef = useRef(null);
+  const stampReadyGate = useRef(createImageReadyGate());
+  const pngReadyGate = useRef(createImageReadyGate());
   const bottomInset = useBottomInset();
   const slide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) setStatus(null);
+    if (visible) {
+      setStatus(null);
+      stampReadyGate.current.reset();
+      pngReadyGate.current.reset();
+    }
     Animated.timing(slide, {
       toValue: visible ? 1 : 0,
       duration: visible ? 220 : 150,
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [visible, slide]);
+  }, [visible, slide, stamp?.uri]);
 
   const handleSaveStamp = useCallback(async () => {
     if (busy) return;
     setBusy('stamp');
     setStatus(null);
+    stampReadyGate.current.reset();
 
-    // One frame so the offscreen stage is definitely laid out before capture.
-    await new Promise((r) => requestAnimationFrame(() => r()));
-
-    const res = await saveStampView(stageRef);
+    const res = await saveStampView(stageRef, stamp?.uri, stampReadyGate.current);
     setBusy(null);
     setStatus(
       res.ok
         ? { ok: true, message: 'Stamp saved to your gallery' }
         : { ok: false, message: res.error, blocked: res.blocked }
     );
-  }, [busy]);
+  }, [busy, stamp?.uri]);
 
   const handleSavePng = useCallback(async () => {
     if (busy) return;
     setBusy('png');
     setStatus(null);
+    pngReadyGate.current.reset();
 
-    await new Promise((r) => requestAnimationFrame(() => r()));
-
-    const res = await saveFramedStampView(pngStageRef);
+    const res = await saveFramedStampView(pngStageRef, stamp?.uri, pngReadyGate.current);
     setBusy(null);
     setStatus(
       res.ok
         ? { ok: true, message: 'Photo saved to your gallery' }
         : { ok: false, message: res.error, blocked: res.blocked }
     );
-  }, [busy]);
+  }, [busy, stamp?.uri]);
 
   const sheetStyle = {
     opacity: slide,
@@ -149,19 +154,31 @@ function SaveStampSheet({ visible, stamp, onClose }) {
       */}
       {visible ? (
         <View style={styles.stageWrap} pointerEvents="none">
-          <View ref={stageRef} collapsable={false} style={styles.stage}>
+          <View
+            ref={stageRef}
+            collapsable={false}
+            style={[styles.stage, styles.stageSized]}
+          >
             <StampRenderer
               uri={stamp?.uri}
               width={CAPTURE_WIDTH}
               rotation={0}
+              forceSvg
+              onImageReady={() => stampReadyGate.current.notify()}
             />
           </View>
-          <View ref={pngStageRef} collapsable={false} style={styles.stage}>
+          <View
+            ref={pngStageRef}
+            collapsable={false}
+            style={[styles.stage, styles.stageSized, styles.framedStage]}
+          >
             <StampRenderer
               uri={stamp?.uri}
               width={CAPTURE_WIDTH}
               rotation={0}
               framed
+              forceSvg
+              onImageReady={() => pngReadyGate.current.notify()}
             />
           </View>
         </View>
@@ -264,11 +281,17 @@ const styles = StyleSheet.create({
   /* Far off-screen: rendered (so it can be captured) but never visible. */
   stageWrap: {
     position: 'absolute',
-    left: -9999,
+    left: -10000,
     top: 0,
-    opacity: 0.01,
   },
   stage: { backgroundColor: 'transparent' },
+  stageSized: {
+    width: CAPTURE_WIDTH,
+    height: CAPTURE_HEIGHT,
+  },
+  framedStage: {
+    backgroundColor: '#FFFFFF',
+  },
 
   wrap: { flex: 1, justifyContent: 'flex-end' },
   scrim: {
