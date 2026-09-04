@@ -2,7 +2,8 @@
  * SaveStampSheet.js
  *
  * "Save to device" sheet: choose the scalloped STAMP (transparent PNG) or the
- * full photo inside a white stamp frame, then write it to the gallery.
+ * full photo inside a white stamp frame with transparent cut-out corners, then
+ * write it to the gallery.
  *
  * THE OFFSCREEN STAGE
  * -------------------
@@ -224,7 +225,7 @@ function SaveStampSheet({ visible, stamp, onClose }) {
             <Option
               icon="image"
               title="Save as PNG"
-              body="Full photo inside a white stamp border"
+              body="White stamp border with transparent cut-out corners"
               onPress={handleSavePng}
               busy={busy === 'png'}
               disabled={unavailable}
@@ -289,9 +290,9 @@ const styles = StyleSheet.create({
     width: CAPTURE_WIDTH,
     height: CAPTURE_HEIGHT,
   },
-  framedStage: {
-    backgroundColor: '#FFFFFF',
-  },
+  // StampRenderer paints the white paper border itself. A transparent capture
+  // stage preserves the scalloped cut-out corners, exactly like Share.
+  framedStage: { backgroundColor: 'transparent' },
 
   wrap: { flex: 1, justifyContent: 'flex-end' },
   scrim: {
